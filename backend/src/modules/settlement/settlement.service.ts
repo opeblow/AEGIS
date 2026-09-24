@@ -9,7 +9,7 @@ import {
   settlementTransitionTypeFor,
   type SettlementStatus,
 } from "./settlement.state.js";
-import { validateInitiateSettlementBody } from "./settlement.schemas.js";
+import { validateInitiateSettlementBody, validateSubmitSettlementBody } from "./settlement.schemas.js";
 import {
   toPublicSettlement,
   toPublicSettlementTransition,
@@ -185,7 +185,9 @@ export async function submitSettlement(
   settlementId: string,
   actorUserId: string,
   meta: RequestMeta,
+  body?: unknown,
 ): Promise<SettlementActionResult> {
+  const validated = validateSubmitSettlementBody(body);
   const settlement = await prisma.settlement.findFirst({
     where: { id: settlementId, organizationId },
     include: { deal: true },
@@ -227,7 +229,14 @@ export async function submitSettlement(
         amount: settlement.amount.toString(),
         currency: settlement.currency,
         assetIdentifier: settlement.assetIdentifier ?? undefined,
-        metadata: settlement.metadata as Record<string, unknown> | undefined,
+        metadata: {
+          ...((settlement.metadata as Record<string, unknown>) ?? {}),
+          // Canton (Metatarz) flow: the executed transfer's update id,
+          // reported by the user's browser wallet after signing.
+          ...(validated.updateId ? { updateId: validated.updateId } : {}),
+          ...(validated.signedBy ? { signedBy: validated.signedBy } : {}),
+          ...(validated.senderAddress ? { senderAddress: validated.senderAddress } : {}),
+        },
       };
 
       const providerResult = await getSettlementProvider().submit(settlementId, submissionPayload);

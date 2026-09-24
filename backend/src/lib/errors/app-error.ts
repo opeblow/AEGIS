@@ -124,7 +124,12 @@ export type ErrorCode =
   // OneSwap integration (Phase 11)
   | "ONESWAP_API_ERROR"
   | "ONESWAP_TIMEOUT"
-  | "ONESWAP_NETWORK";
+  | "ONESWAP_NETWORK"
+  | "ONESWAP_NOT_CONFIGURED"
+  | "ONESWAP_RATE_LIMITED"
+  | "ONESWAP_OPERATION_UNSUPPORTED"
+  | "ONESWAP_IDEMPOTENCY_CONFLICT"
+  | "ONESWAP_OPERATION_NOT_FOUND";
 
 /**
  * Application error carrying an HTTP status, a stable machine-readable code,

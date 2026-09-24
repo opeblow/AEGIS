@@ -2,22 +2,26 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Landmark, RefreshCcw, Send, ShieldCheck } from "lucide-react";
+import { Landmark, RefreshCcw, Send, ShieldCheck, WalletCards } from "lucide-react";
 import { useApi } from "@/lib/hooks";
 import { post } from "@/lib/api";
-import { fmtDate, fmtMoney, timeAgo, uuid } from "@/lib/format";
+import { fmtDate, fmtMoney, fmtHash, timeAgo, uuid } from "@/lib/format";
 import { humanLabel, toneFor } from "@/lib/status";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, KeyValues } from "@/components/ui/data";
 import { StatusChip } from "@/components/ui/badge";
 import { Empty, Loading } from "@/components/ui/atoms";
+import { Field, Input, Select } from "@/components/ui/inputs";
 import { useToast } from "@/components/ui/toast";
+import { useCantonWallet } from "@/lib/canton/context";
+import { CANTON_TOKENS } from "@/lib/canton/config";
 import type { PublicSettlement, PublicReconciliation } from "@/lib/types";
 
 export default function DealSettlement() {
   const params = useParams<{ dealId: string }>();
   const dealId = params.dealId;
   const { push } = useToast();
+  const wallet = useCantonWallet();
 
   const settlementApi = useApi<{ settlements: PublicSettlement[]; total: number }>(
     dealId ? `/deals/${dealId}/settlement` : null,
@@ -50,11 +54,11 @@ export default function DealSettlement() {
     }
   };
 
-  const submit = async (s: PublicSettlement) => {
+  const submit = async (s: PublicSettlement, body: { updateId?: string; senderAddress?: string }) => {
     setSubmittingId(s.id);
     setError(null);
     try {
-      await post(`/deals/${dealId}/settlement/${s.id}/submit`, {});
+      await post(`/deals/${dealId}/settlement/${s.id}/submit`, body);
       push({ kind: "success", title: "Submitted to provider", message: s.provider });
       settlementApi.reload();
     } catch (e) {
@@ -133,11 +137,20 @@ export default function DealSettlement() {
             </div>
             <div className="border-t border-line p-4 pt-3">
               <div className="flex flex-wrap items-center gap-2">
-                {["CREATED", "PENDING"].includes(s.status) && (
-                  <Button size="sm" variant="secondary" loading={submittingId === s.id} onClick={() => submit(s)}>
-                    Submit to provider
-                  </Button>
-                )}
+                {["CREATED", "PENDING"].includes(s.status) &&
+                  (s.provider === "CANTON" ? (
+                    <CantonPayActions
+                      settlement={s}
+                      walletConnected={wallet.connected}
+                      onPay={(updateId, senderAddress) => submit(s, { updateId, senderAddress })}
+                      onError={(message) => setError(message)}
+                      onInfo={(m) => push({ kind: "success", title: "Canton transfer signed", message: m })}
+                    />
+                  ) : (
+                    <Button size="sm" variant="secondary" loading={submittingId === s.id} onClick={() => submit(s, {})}>
+                      Submit to provider
+                    </Button>
+                  ))}
                 {toneFor.settlement(s.status) !== "neutral" && ["SETTLED", "PENDING"].includes(s.status) && (
                   <Button size="sm" variant="ghost" icon={<RefreshCcw className="size-4" />} onClick={() => reconcile(s)}>
                     Reconcile
@@ -177,6 +190,109 @@ export default function DealSettlement() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Canton (Metatarz) settlement payment: the user executes the CC/CIP-56
+ * transfer in their own non-custodial wallet, then submits the returned
+ * update id so the backend verifies and settles against the ledger.
+ */
+function CantonPayActions({
+  settlement,
+  walletConnected,
+  onPay,
+  onError,
+  onInfo,
+}: {
+  settlement: PublicSettlement;
+  walletConnected: boolean;
+  onPay: (updateId: string, senderAddress?: string) => Promise<void>;
+  onError: (message: string) => void;
+  onInfo: (message: string) => void;
+}) {
+  const wallet = useCantonWallet();
+  const [to, setTo] = useState("");
+  const [token, setToken] = useState(settlement.assetIdentifier ?? "CC");
+  const [payAmount, setPayAmount] = useState(settlement.amount);
+  const [paying, setPaying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [updateId, setUpdateId] = useState<string | null>(null);
+
+  const tokenOptions = CANTON_TOKENS.map((t) => ({ value: t.symbol, label: t.symbol }));
+
+  const execute = async () => {
+    if (!wallet.connected) {
+      onError("Connect the Metatarz wallet before paying.");
+      return;
+    }
+    const found = CANTON_TOKENS.find((t) => t.symbol === token);
+    if (!to) {
+      onError("Enter the recipient party (counterparty) address.");
+      return;
+    }
+    setPaying(true);
+    try {
+      const update = await wallet.sendTransfer({ to, amount: payAmount, token: found ?? CANTON_TOKENS[0] });
+      setUpdateId(update);
+      onInfo(fmtHash(update));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "The wallet transfer did not complete.");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const submitSigned = async () => {
+    if (!updateId) return;
+    setSubmitting(true);
+    try {
+      await onPay(updateId, wallet.account ?? undefined);
+      setUpdateId(null);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-3 rounded-xl border border-line bg-ink-925 p-3">
+      {!wallet.connected && (
+        <Button size="sm" variant="secondary" icon={<WalletCards className="size-4" />} loading={wallet.connecting} onClick={() => wallet.connect().catch(() => undefined)}>
+          Connect Metatarz wallet first
+        </Button>
+      )}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Field label="Token">
+          <Select options={tokenOptions} value={token} onChange={(e) => setToken(e.target.value)} />
+        </Field>
+        <Field label="Amount">
+          <Input inputMode="decimal" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+        </Field>
+        <div className="col-span-2 lg:col-span-1">
+          <Field label="Recipient (Canton party)" hint={settlement.currency === "CC" ? `${settlement.amount} ${settlement.currency} expected` : undefined}>
+            <Input mono placeholder="0x… or Canton::…" value={to} onChange={(e) => setTo(e.target.value)} />
+          </Field>
+        </div>
+      </div>
+      {updateId ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusChip size="xs" label={`update ${fmtHash(updateId)}`} tone="accent" dot />
+          <Button size="sm" variant="success" icon={<Send className="size-4" />} loading={submitting} onClick={submitSigned}>
+            Submit & verify on ledger
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setUpdateId(null)}>
+            Clear
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button size="sm" icon={<Send className="size-4" />} loading={paying} disabled={!walletConnected} onClick={execute}>
+            Execute transfer
+          </Button>
+          <p className="text-[11px] text-faintest">Signs in Metatarz · returns a Canton update id</p>
+        </div>
+      )}
     </div>
   );
 }

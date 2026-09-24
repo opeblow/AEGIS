@@ -15,6 +15,7 @@ const tabs = [
   { key: "overview", label: "Overview", href: "" },
   { key: "room", label: "Room", href: "/room" },
   { key: "intelligence", label: "Intelligence", href: "/intelligence" },
+  { key: "canton", label: "Canton / OneSwap", href: "/canton" },
   { key: "settlement", label: "Settlement", href: "/settlement" },
   { key: "audit", label: "Audit trail", href: "/audit" },
 ];

@@ -1,0 +1,1370 @@
+// ============================================================
+// Aegis Backend — Prisma schema (Phase 3)
+//
+// Phase 2 adds the authentication data model: users, server-side
+// sessions, email-verification challenges, password-reset tokens,
+// and security events.
+//
+// Phase 3 adds the authorization foundation: organizations,
+// memberships, roles, permissions, role-permission mapping, and
+// organization invitations. Aegis is an ORGANIZATION-FIRST system:
+// authorization always flows
+//
+//   User -> OrganizationMembership -> Role -> Permission -> Resource
+//
+// Security model:
+//   - Passwords            -> Argon2id hash (never reversible)
+//   - Session tokens       -> random 256-bit token, SHA-256 hash stored
+//   - Verification tokens  -> random 256-bit token, SHA-256 hash stored
+//   - Password reset tokens-> random 256-bit token, SHA-256 hash stored
+//   - Invitation tokens    -> random 256-bit token, SHA-256 hash stored
+//   - CSRF tokens          -> random token per session, hash stored on Session
+// Raw tokens are NEVER persisted.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+  REMOVED
+}
+
+/// Account the platform authenticates. Status gates access.
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  sessions           Session[]
+  emailVerifications EmailVerification[]
+  passwordResets     PasswordReset[]
+  securityEvents     SecurityEvent[]
+  memberships        OrganizationMember[]
+  createdInvitations OrganizationInvitation[] @relation("InvitationCreator")
+  deals              Deal[]
+  dealTransitions    DealStateTransition[]
+
+  createdCounterparties      OrganizationCounterparty[]  @relation("CounterpartyCreator")
+  invitedDealParticipants    DealParticipant[]           @relation("DealParticipantInviter")
+  createdDealInvitations     DealParticipantInvitation[] @relation("DealInvitationCreator")
+  dealParticipantTransitions DealParticipantTransition[]
+  offerTransitions           OfferTransition[]
+
+  createdDocuments             DealDocument[]              @relation("DocumentCreator")
+  documentTransitions          DealDocumentTransition[]
+  reviewedDocuments            DealDocument[]              @relation("DocumentReviewer")
+  createdRequirements          DealRequirement[]           @relation("RequirementCreator")
+  satisfiedRequirements        DealRequirement[]           @relation("RequirementSatisfier")
+  waivedRequirements           DealRequirement[]           @relation("RequirementWaiver")
+  requirementTransitions       DealRequirementTransition[]
+  attachedRequirementDocuments RequirementDocument[]       @relation("RequirementDocumentAttacher")
+  approvalPoliciesCreated      ApprovalPolicy[]            @relation("ApprovalPolicyCreator")
+  approvalRequests             ApprovalRequest[]           @relation("ApprovalRequestApprover")
+  approvalDecisions            ApprovalDecision[]          @relation("ApprovalDecisionActor")
+
+  initiatedSettlements    Settlement[]           @relation("SettlementInitiator")
+  settlementTransitions   SettlementTransition[] @relation("SettlementTransitionActor")
+  reconciliationsResolved Reconciliation[]       @relation("ReconciliationResolver")
+  dealIntelligenceRuns    DealIntelligenceRun[]
+  dealOptimizationRuns    DealOptimizationRun[]
+
+  @@index([email])
+  @@index([status])
+}
+
+/// Tenancy boundary. Every protected business resource introduced in later
+/// phases must be scopeable to an organization.
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String             @unique
+  legalName String?
+  country   String?
+  timezone  String?
+  status    OrganizationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  members         OrganizationMember[]
+  invitations     OrganizationInvitation[]
+  securityEvents  SecurityEvent[]
+  roles           Role[]
+  deals           Deal[]
+  dealTransitions DealStateTransition[]
+
+  counterpartiesOutgoing     OrganizationCounterparty[]  @relation("CounterpartyPrimary")
+  counterpartiesIncoming     OrganizationCounterparty[]  @relation("CounterpartySecondary")
+  dealParticipants           DealParticipant[]
+  dealParticipantTransitions DealParticipantTransition[]
+  dealParticipantInvitations DealParticipantInvitation[]
+
+  documents                     DealDocument[]
+  documentTransitions           DealDocumentTransition[]
+  documentVisibilityParticipant DealDocumentVisibilityParticipant[]
+  requirements                  DealRequirement[]                   @relation("RequirementCreatorOrg")
+  assignedRequirements          DealRequirement[]                   @relation("RequirementAssignee")
+  requirementTransitions        DealRequirementTransition[]
+  attachedRequirementDocuments  RequirementDocument[]
+  approvalPolicies              ApprovalPolicy[]
+  approvalWorkflows             ApprovalWorkflow[]
+  approvalRequests              ApprovalRequest[]
+  approvalDecisions             ApprovalDecision[]
+
+  settlements           Settlement[]
+  settlementTransitions SettlementTransition[]
+  reconciliations       Reconciliation[]
+  dealIntelligenceRuns  DealIntelligenceRun[]
+  dealOptimizationRuns  DealOptimizationRun[]
+
+  @@index([status])
+}
+
+/// A user's relationship to an organization. Exactly one row per
+/// (organizationId, userId) — enforced by the database — with an explicit
+/// lifecycle status (never plain deletion): ACTIVE, SUSPENDED, INVITED,
+/// REMOVED.
+model OrganizationMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  roleId         String           @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime?
+  lastActiveAt   DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, status])
+  @@index([userId, status])
+  @@index([roleId])
+}
+
+/// Data-backed role. System roles (OWNER/ADMIN/MEMBER/VIEWER) are global
+/// (organizationId = null). Organizations may define custom roles in a later
+/// phase; the authorization layer resolves role -> permissions centrally.
+model Role {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @unique
+  description    String?
+  isSystem       Boolean  @default(false)
+  organizationId String?  @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization            Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members                 OrganizationMember[]
+  permissions             RolePermission[]
+  organizationInvitations OrganizationInvitation[]
+
+  @@index([organizationId])
+}
+
+/// Granular, stable permission identifier (e.g. "organization:update").
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  category    String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+/// Role -> permission mapping. Never editable by clients; system roles are
+/// seeded server-side and define what each role may do.
+model RolePermission {
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  assignedAt   DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+/// Single-use organization invitation. tokenHash only — the raw 256-bit token
+/// is delivered to the recipient (dev email) and held nowhere on the server.
+model OrganizationInvitation {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @db.Uuid
+  email           String
+  roleId          String    @db.Uuid
+  tokenHash       String    @unique
+  createdByUserId String    @db.Uuid
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  createdBy    User         @relation("InvitationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+/// Opaque server-side session. tokenHash only — the raw token lives in the
+/// client's HttpOnly cookie and nowhere else.
+model Session {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  tokenHash     String    @unique
+  csrfTokenHash String?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime  @default(now())
+  revokedAt     DateTime?
+  userAgent     String?
+  ipAddress     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([userId, revokedAt])
+}
+
+/// Single-use email-verification challenge. Hash-only token storage.
+model EmailVerification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Single-use password-reset challenge. Hash-only token storage.
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Security-relevant authentication events for the future audit pipeline.
+/// Never stores passwords or raw tokens.
+model SecurityEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @db.Uuid
+  organizationId String?  @db.Uuid
+  type           String
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([type, createdAt])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Deals (Phase 4)
+//
+// Every deal is a legal-commercial agreement scoped to exactly one
+// organization (multi-tenant). Financial exposure must never be represented
+// as a floating-point number: monetary amounts are stored as NUMERIC
+// (Prisma Decimal) and validated against ISO 4217 currency precision rules.
+// ---------------------------------------------------------------------------
+
+enum DealType {
+  RWA_PURCHASE
+  RWA_SALE
+  PRIVATE_TRADE
+  OTHER
+}
+
+enum DealStatus {
+  DRAFT
+  OPEN
+  NEGOTIATING
+  AGREED
+  APPROVAL_PENDING
+  APPROVED
+  SETTLEMENT_PENDING
+  SETTLED
+  RECONCILING
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  FAILED
+  DISPUTED
+}
+
+/// A deal (legal/commercial agreement) owned by one organization. Monetary
+/// fields are NUMERIC only — no float representation anywhere in the money
+/// path. State lifecycle moves exclusively through DealStateTransition rows
+/// (append-only ledger); the `status` column is a denormalized projection of
+/// the latest transition and is only ever changed by the state machine.
+model Deal {
+  id                     String     @id @default(uuid()) @db.Uuid
+  organizationId         String     @db.Uuid
+  createdByUserId        String     @db.Uuid
+  reference              String
+  type                   DealType
+  status                 DealStatus @default(DRAFT)
+  name                   String
+  description            String?
+  currency               String
+  /// Monetary exposure. Stored as NUMERIC — validated for ISO 4217 minor-unit
+  /// precision at the boundary; never passed through a JS float.
+  notionalAmount         Decimal    @db.Decimal(28, 8)
+  settledAmount          Decimal?   @db.Decimal(28, 8)
+  settlementDate         DateTime?
+  expiresAt              DateTime?
+  metadata               Json?
+  /// Idempotency (create): SHA-256 of the client-supplied idempotency key,
+  /// unique per organization so a retried create returns the original deal.
+  /// `idempotencyPayloadHash` is the SHA-256 fingerprint of the authorized
+  /// request body — replaying the same key with a materially different payload
+  /// is rejected. Both are never exposed on the wire.
+  idempotencyKeyHash     String?    @db.VarChar(64)
+  idempotencyPayloadHash String?    @db.VarChar(64)
+  version                Int        @default(1)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  transitions DealStateTransition[]
+
+  participants           DealParticipant[]
+  participantTransitions DealParticipantTransition[]
+  participantInvitations DealParticipantInvitation[]
+  offers                 Offer[]
+  offerTransitions       OfferTransition[]
+
+  documents              DealDocument[]
+  documentTransitions    DealDocumentTransition[]
+  requirements           DealRequirement[]
+  requirementTransitions DealRequirementTransition[]
+
+  approvalWorkflow  ApprovalWorkflow[]
+  approvalRequests  ApprovalRequest[]
+  approvalDecisions ApprovalDecision[]
+
+  settlement            Settlement?
+  settlementTransitions SettlementTransition[]
+  reconciliation        Reconciliation?
+
+  dealIntelligenceRuns DealIntelligenceRun[]
+  dealOptimizationRuns DealOptimizationRun[]
+
+  @@unique([organizationId, reference])
+  @@unique([organizationId, idempotencyKeyHash])
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+  @@index([organizationId, createdAt])
+  @@index([createdByUserId])
+}
+
+/// Append-only record of every deal state change. The legal audit trail for a
+/// deal: status is immutable-history, never edited in place. A transition is
+/// the unit of idempotency — a client-supplied requestId must map to exactly
+/// one transaction so retried requests are naturally deduplicated.
+model DealStateTransition {
+  id             String     @id @default(uuid()) @db.Uuid
+  dealId         String     @db.Uuid
+  organizationId String     @db.Uuid
+  requestId      String?
+  transitionType String
+  fromStatus     DealStatus
+  toStatus       DealStatus
+  reason         String?
+  /// Nullable: system-initiated transitions (e.g. the expiry worker running on
+  /// a deadline) have no human actor; user-initiated transitions always carry
+  /// the authenticated user id.
+  actorUserId    String?    @db.Uuid
+  createdAt      DateTime   @default(now())
+
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  /// Idempotency: a retried request with the same (requestId, toStatus) maps to
+  /// the same transition row; a different toStatus under the same requestId is
+  /// rejected as a conflict (a client may not "reuse" an idempotency key for a
+  /// different transition).
+  @@unique([dealId, requestId, toStatus])
+  @@unique([organizationId, requestId, toStatus])
+  @@index([dealId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([dealId, fromStatus, toStatus])
+  @@index([actorUserId])
+  @@index([organizationId, createdAt, toStatus])
+}
+
+// ---------------------------------------------------------------------------
+// Counterparties & negotiation (Phase 5)
+//
+// Private multi-party negotiation model:
+//  - OrganizationCounterparty: normalized, bidirectional org<->org trust link.
+//    One row per PAIR (pairKey is the SHA-256 of the two sorted org ids and is
+//    unique), so A<->B can never exist twice under any concurrency.
+//  - DealParticipant: one row per (dealId, organizationId). The deal's owner
+//    organization auto-joins as OWNER/ACTIVE when the deal is created; every
+//    other party lands as INVITED and is activated by accepting a secure
+//    invitation. Lifecycle never uses plain deletion (INVITED, ACTIVE,
+//    DECLINED, REMOVED, SUSPENDED), mirrored by DealParticipantTransition.
+//  - DealParticipantInvitation: token-hash-only secure invite. Acceptance
+//    requires an ACTIVE membership in the invited organization and a
+//    normalized-email match with the account performing the accept.
+//  - Offer / OfferTransition: confidential point-to-point offers. An offer is
+//    visible ONLY to the creating and recipient organizations (a third party
+//    receives 404). Submitted terms are immutable; status/version move
+//    exclusively through transition rows + a conditional status+version
+//    update (the same optimistic-concurrency discipline as deals).
+//  - Money is NUMERIC(28,8)/string only — same ISO 4217 discipline as Phase 4.
+// ---------------------------------------------------------------------------
+
+enum CounterpartyStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum CounterpartyVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DealParticipantType {
+  OWNER
+  COUNTERPARTY
+  OBSERVER
+}
+
+enum DealParticipantStatus {
+  INVITED
+  ACTIVE
+  DECLINED
+  REMOVED
+  SUSPENDED
+}
+
+enum OfferStatus {
+  DRAFT
+  SUBMITTED
+  COUNTERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+  SUPERSEDED
+}
+
+/// Normalized, bidirectional counterparty relationship between two
+/// organizations. `organizationId` is the initiating (primary) side; the other
+/// side is `counterpartyOrganizationId`. Both sides share this single record:
+/// status (PENDING/ACTIVE/SUSPENDED/REVOKED) is a joint property. The
+/// `pairKey` unique constraint (SHA-256 of the two sorted organization ids)
+/// makes swapped duplicate rows (A->B plus B->A) structurally impossible.
+model OrganizationCounterparty {
+  id                         String                         @id @default(uuid()) @db.Uuid
+  organizationId             String                         @db.Uuid
+  counterpartyOrganizationId String                         @db.Uuid
+  /// SHA-256 of the two sorted org ids. Unique guard against swapped pairs.
+  pairKey                    String                         @unique @db.VarChar(64)
+  status                     CounterpartyStatus             @default(PENDING)
+  verificationStatus         CounterpartyVerificationStatus @default(UNVERIFIED)
+  createdByUserId            String                         @db.Uuid
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+
+  organization             Organization @relation("CounterpartyPrimary", fields: [organizationId], references: [id], onDelete: Cascade)
+  counterpartyOrganization Organization @relation("CounterpartySecondary", fields: [counterpartyOrganizationId], references: [id], onDelete: Cascade)
+  createdBy                User         @relation("CounterpartyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, counterpartyOrganizationId])
+  @@index([organizationId, status])
+  @@index([counterpartyOrganizationId])
+  @@index([counterpartyOrganizationId, status])
+  @@index([verificationStatus])
+}
+
+/// A deal party. One row per (dealId, organizationId) — enforced by the
+/// database — with an explicit lifecycle migration path (INVITED -> ACTIVE via
+/// invitation acceptance; DECLINED/REMOVED/SUSPENDED are soft terminal/side
+/// states). The OWNER organization is auto-created in ACTIVE at deal creation.
+model DealParticipant {
+  id              String                @id @default(uuid()) @db.Uuid
+  dealId          String                @db.Uuid
+  organizationId  String                @db.Uuid
+  participantType DealParticipantType   @default(COUNTERPARTY)
+  status          DealParticipantStatus @default(INVITED)
+  invitedByUserId String?               @db.Uuid
+  joinedAt        DateTime?
+  version         Int                   @default(1)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("DealParticipantInviter", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  transitions    DealParticipantTransition[]
+  invitations    DealParticipantInvitation[]
+  offersCreated  Offer[]                     @relation("OfferCreator")
+  offersReceived Offer[]                     @relation("OfferRecipient")
+
+  @@unique([dealId, organizationId])
+  @@index([organizationId, status])
+  @@index([dealId, status])
+  @@index([invitedByUserId])
+}
+
+/// Append-only lifecycle ledger for a deal participant. The `status` column is
+/// never edited in place — every change appends a row here (requestId carries
+/// idempotency, mirroring DealStateTransition).
+model DealParticipantTransition {
+  id                String                @id @default(uuid()) @db.Uuid
+  dealParticipantId String                @db.Uuid
+  dealId            String                @db.Uuid
+  organizationId    String                @db.Uuid
+  requestId         String?
+  transitionType    String
+  fromStatus        DealParticipantStatus
+  toStatus          DealParticipantStatus
+  reason            String?
+  actorUserId       String?               @db.Uuid
+  createdAt         DateTime              @default(now())
+
+  participant  DealParticipant @relation(fields: [dealParticipantId], references: [id], onDelete: Cascade)
+  deal         Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([dealParticipantId, requestId, toStatus])
+  @@index([dealId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([dealParticipantId, createdAt])
+  @@index([dealId, fromStatus, toStatus])
+  @@index([actorUserId])
+}
+
+/// Secure invite to join a deal. Only the SHA-256 token hash is persisted; the
+/// raw 256-bit token travels to the invitee by email (dev mailbox). Acceptance
+/// links to the pre-created DealParticipant row (the invitee organization is a
+/// participant from the moment the invite is sent, in INVITED state).
+model DealParticipantInvitation {
+  id              String              @id @default(uuid()) @db.Uuid
+  dealId          String              @db.Uuid
+  organizationId  String              @db.Uuid
+  participantId   String?             @db.Uuid
+  email           String
+  participantType DealParticipantType @default(COUNTERPARTY)
+  tokenHash       String              @unique
+  invitedByUserId String              @db.Uuid
+  createdAt       DateTime            @default(now())
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  revokedAt       DateTime?
+
+  deal         Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  participant  DealParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  createdBy    User             @relation("DealInvitationCreator", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([dealId])
+  @@index([organizationId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+/// A confidential offer in a deal. Submitted terms are immutable for the life
+/// of the offer; only `status` (+ `version`) move, and only through
+/// OfferTransition rows. Visibility is point-to-point: an offer is readable
+/// solely by the organizations of `createdByParticipantId` and
+/// `recipientParticipantId`. `parentOfferId` chains counteroffers.
+model Offer {
+  id                     String      @id @default(uuid()) @db.Uuid
+  dealId                 String      @db.Uuid
+  createdByParticipantId String      @db.Uuid
+  recipientParticipantId String      @db.Uuid
+  parentOfferId          String?     @db.Uuid
+  status                 OfferStatus @default(DRAFT)
+  version                Int         @default(1)
+  currency               String
+  /// Contractual amount. NUMERIC only — validated for ISO 4217 minor-unit
+  /// precision at the boundary; never a JS float.
+  amount                 Decimal     @db.Decimal(28, 8)
+  price                  Decimal?    @db.Decimal(28, 8)
+  settlementDate         DateTime?
+  expiresAt              DateTime?
+  submittedAt            DateTime?
+  idempotencyKeyHash     String?     @db.VarChar(64)
+  idempotencyPayloadHash String?     @db.VarChar(64)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  deal        Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdBy   DealParticipant   @relation("OfferCreator", fields: [createdByParticipantId], references: [id], onDelete: Cascade)
+  recipient   DealParticipant   @relation("OfferRecipient", fields: [recipientParticipantId], references: [id], onDelete: Cascade)
+  parentOffer Offer?            @relation("OfferChain", fields: [parentOfferId], references: [id], onDelete: SetNull)
+  childOffers Offer[]           @relation("OfferChain")
+  transitions OfferTransition[]
+
+  @@unique([dealId, createdByParticipantId, idempotencyKeyHash])
+  @@index([dealId, status])
+  @@index([dealId, createdAt])
+  @@index([createdByParticipantId])
+  @@index([recipientParticipantId])
+  @@index([parentOfferId])
+  @@index([status])
+}
+
+/// Append-only offer lifecycle ledger. `status` only moves through rows here;
+/// `requestId` (or, for creates/counters, the child's idempotencyKeyHash) is
+/// the idempotency guard so retried requests never double-apply.
+model OfferTransition {
+  id             String      @id @default(uuid()) @db.Uuid
+  offerId        String      @db.Uuid
+  dealId         String      @db.Uuid
+  requestId      String?
+  transitionType String
+  fromStatus     OfferStatus
+  toStatus       OfferStatus
+  reason         String?
+  actorUserId    String?     @db.Uuid
+  createdAt      DateTime    @default(now())
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  deal  Deal  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([offerId, requestId, toStatus])
+  @@index([dealId, createdAt])
+  @@index([offerId, createdAt])
+  @@index([dealId, fromStatus, toStatus])
+  @@index([actorUserId])
+}
+
+// ---------------------------------------------------------------------------
+// Documents & deal requirements (Phase 6)
+//
+// Two related subsystems:
+//  - DealDocument: one IMMUTABLE version per row, chained by `chainId` (the id
+//    of the first version). `version` is the immutable 1-based slot in the
+//    chain; the "current version" is the max-version row of the chain. The
+//    OLD current version is marked SUPERSEDED (conditional update + transition
+//    row) when a replacement version is finalized, so exactly one chain member
+//    is ever "current". Status never moves through a free-form write — every
+//    change appends a DealDocumentTransition row behind a conditional
+//    status+version update (same optimistic-concurrency discipline as offers).
+//    Object bytes live in the pluggable document storage adapter (local-disk
+//    in dev); the `storageKey` is a server-generated path and is NEVER exposed
+//    on the wire or logged.
+//  - DealRequirement: a condition the owner organization attaches to a deal
+//    (hand over a document / provide information / confirm something), with an
+//    explicit status lifecycle moved through DealRequirementTransition rows.
+//    DOCUMENT-type requirements are satisfied by attaching document chains
+//    (RequirementDocument join keyed by the immutable chain id, so re-played
+//    attachments cannot duplicate).
+// ---------------------------------------------------------------------------
+
+enum DocumentStatus {
+  UPLOADING
+  UPLOADED
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  WITHDRAWN
+  SUPERSEDED
+}
+
+enum DocumentVisibility {
+  PRIVATE
+  PARTICIPANTS
+  DEAL_OWNER
+  SPECIFIC_PARTICIPANTS
+}
+
+enum RequirementStatus {
+  OPEN
+  SUBMITTED
+  SATISFIED
+  REJECTED
+  WAIVED
+  EXPIRED
+}
+
+enum RequirementType {
+  DOCUMENT
+  INFORMATION
+  CONFIRMATION
+}
+
+/// One immutable version of a deal document. `chainId` groups versions; the
+/// max-`version` row in a chain is the current version. Uploaded object bytes
+/// live in document storage; only safe metadata is persisted here.
+model DealDocument {
+  id                     String             @id @default(uuid()) @db.Uuid
+  dealId                 String             @db.Uuid
+  organizationId         String             @db.Uuid
+  createdByUserId        String             @db.Uuid
+  /// Client-visible document type. Validated against the server-side catalog
+  /// (see document-types.ts); stored as a plain string so future types do not
+  /// require a migration.
+  documentType           String
+  title                  String
+  description            String?
+  visibility             DocumentVisibility @default(PRIVATE)
+  status                 DocumentStatus     @default(UPLOADING)
+  /// The id of the first version in this chain (immutable group key).
+  chainId                String             @db.Uuid
+  /// Immutable 1-based slot in the chain. Current version = max(version).
+  version                Int                @default(1)
+  supersedesId           String?            @db.Uuid
+  /// Server-generated storage path (org/deal/doc/version). NEVER exposed.
+  storageKey             String?            @unique
+  originalFilename       String?
+  contentType            String?
+  sizeBytes              Int?
+  sha256                 String?            @db.VarChar(64)
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+  /// Upload window before submit; review window after submit/accept. See
+  /// document-state.ts for how each transition re-arms it.
+  expiresAt              DateTime?
+  reviewerUserId         String?            @db.Uuid
+  reviewComment          String?
+  idempotencyKeyHash     String?            @db.VarChar(64)
+  idempotencyPayloadHash String?            @db.VarChar(64)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  deal         Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User           @relation("DocumentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reviewer     User?          @relation("DocumentReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  supersedes   DealDocument?  @relation("DocumentChain", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy DealDocument[] @relation("DocumentChain")
+
+  transitions            DealDocumentTransition[]
+  visibilityParticipants DealDocumentVisibilityParticipant[]
+  requirements           RequirementDocument[]
+
+  @@unique([dealId, organizationId, idempotencyKeyHash])
+  @@unique([chainId, version])
+  @@index([chainId])
+  @@index([dealId, status])
+  @@index([dealId, organizationId])
+  @@index([dealId, visibility])
+  @@index([organizationId, status])
+  @@index([supersedesId])
+  @@index([status, expiresAt])
+  @@index([createdByUserId])
+}
+
+/// Append-only lifecycle ledger for a DealDocument. Status only moves through
+/// rows here; requestId (or, for creates/replaces, the idempotency hash) is
+/// the idempotency guard so retried requests never double-apply.
+model DealDocumentTransition {
+  id             String         @id @default(uuid()) @db.Uuid
+  documentId     String         @db.Uuid
+  dealId         String         @db.Uuid
+  organizationId String         @db.Uuid
+  requestId      String?
+  transitionType String
+  fromStatus     DocumentStatus
+  toStatus       DocumentStatus
+  reason         String?
+  actorUserId    String?        @db.Uuid
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+
+  document     DealDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, requestId, toStatus])
+  @@index([dealId, createdAt])
+  @@index([documentId, createdAt])
+  @@index([dealId, fromStatus, toStatus])
+  @@index([actorUserId])
+}
+
+/// Explicit grant when a document's visibility is SPECIFIC_PARTICIPANTS. The
+/// uploader organization and the deal owner organization are always allowed to
+/// view; this table extends the window to specific participant organizations.
+model DealDocumentVisibilityParticipant {
+  documentId     String   @db.Uuid
+  organizationId String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  document     DealDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, organizationId])
+  @@index([organizationId])
+}
+
+/// A condition the deal owner organization sets on a deal. `organizationId` is
+/// the creating (owner) organization; `assignedOrganizationId` optionally
+/// targets a specific participant organization for submission.
+model DealRequirement {
+  id                     String            @id @default(uuid()) @db.Uuid
+  dealId                 String            @db.Uuid
+  organizationId         String            @db.Uuid
+  createdByUserId        String            @db.Uuid
+  requirementType        RequirementType
+  title                  String
+  description            String?
+  status                 RequirementStatus @default(OPEN)
+  /// Whether this requirement blocks deal readiness. Non-required (optional)
+  /// requirements never block.
+  required               Boolean           @default(true)
+  dueAt                  DateTime?
+  assignedOrganizationId String?           @db.Uuid
+  satisfiedAt            DateTime?
+  satisfiedByUserId      String?           @db.Uuid
+  rejectionReason        String?
+  waivedAt               DateTime?
+  waivedByUserId         String?           @db.Uuid
+  idempotencyKeyHash     String?           @db.VarChar(64)
+  idempotencyPayloadHash String?           @db.VarChar(64)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  deal                 Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization         Organization  @relation("RequirementCreatorOrg", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy            User          @relation("RequirementCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  assignedOrganization Organization? @relation("RequirementAssignee", fields: [assignedOrganizationId], references: [id], onDelete: SetNull)
+  satisfiedBy          User?         @relation("RequirementSatisfier", fields: [satisfiedByUserId], references: [id], onDelete: Restrict)
+  waivedBy             User?         @relation("RequirementWaiver", fields: [waivedByUserId], references: [id], onDelete: Restrict)
+
+  transitions DealRequirementTransition[]
+  documents   RequirementDocument[]
+
+  @@unique([dealId, organizationId, idempotencyKeyHash])
+  @@index([dealId, status])
+  @@index([dealId, assignedOrganizationId])
+  @@index([assignedOrganizationId, status])
+  @@index([status, dueAt])
+  @@index([createdByUserId])
+}
+
+/// Append-only lifecycle ledger for a DealRequirement.
+model DealRequirementTransition {
+  id             String            @id @default(uuid()) @db.Uuid
+  requirementId  String            @db.Uuid
+  dealId         String            @db.Uuid
+  organizationId String            @db.Uuid
+  requestId      String?
+  transitionType String
+  fromStatus     RequirementStatus
+  toStatus       RequirementStatus
+  reason         String?
+  actorUserId    String?           @db.Uuid
+  createdAt      DateTime          @default(now())
+
+  requirement  DealRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  deal         Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([requirementId, requestId, toStatus])
+  @@index([dealId, createdAt])
+  @@index([requirementId, createdAt])
+  @@index([dealId, fromStatus, toStatus])
+  @@index([actorUserId])
+}
+
+/// Join between a DOCUMENT-type requirement and an attached document CHAIN.
+/// `documentGroupId` is the immutable chain id (the first version's id) — a
+/// plain column (no FK) so it survives supersession and re-attachment of the
+/// same chain dedupes naturally via the composite primary key.
+model RequirementDocument {
+  requirementId    String   @db.Uuid
+  documentGroupId  String   @db.Uuid
+  /// The specific document version that was attached (informational).
+  documentId       String   @db.Uuid
+  organizationId   String   @db.Uuid
+  attachedByUserId String   @db.Uuid
+  attachedAt       DateTime @default(now())
+
+  requirement  DealRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  document     DealDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  attachedBy   User            @relation("RequirementDocumentAttacher", fields: [attachedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([requirementId, documentGroupId])
+  @@index([documentId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Approval Engine (Phase 7)
+//
+// Approval is explicit, authenticated, attributable, timestamped, immutable
+// after decision, auditable, tied to a deal + policy, and protected against
+// replay. Policy snapshots are stored on the workflow so a running workflow
+// never silently changes when a policy is edited.
+// ---------------------------------------------------------------------------
+
+enum ApprovalPolicyStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+/// An approval policy owned by an organization. Rules determine when
+/// approval is required for a deal. Status gates whether the policy can
+/// be selected by new workflows.
+model ApprovalPolicy {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @db.Uuid
+  name            String
+  description     String?
+  status          ApprovalPolicyStatus @default(DRAFT)
+  priority        Int                  @default(0)
+  createdByUserId String               @db.Uuid
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                 @relation("ApprovalPolicyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  rules        ApprovalPolicyRule[]
+  workflows    ApprovalWorkflow[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+/// A deterministic rule inside an approval policy. The `config` field is
+/// a JSON snapshot of rule parameters (threshold amounts, role names,
+/// rule-type specific fields). The evaluator reads config deterministically.
+model ApprovalPolicyRule {
+  id        String           @id @default(uuid()) @db.Uuid
+  policyId  String           @db.Uuid
+  ruleType  ApprovalRuleType
+  priority  Int              @default(0)
+  config    Json
+  createdAt DateTime         @default(now())
+
+  policy ApprovalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([policyId, ruleType])
+}
+
+enum ApprovalRuleType {
+  NOTIONAL_THRESHOLD
+  DEAL_TYPE
+  CURRENCY
+  REQUIRED_DOCUMENTS
+  REQUIRED_REQUIREMENTS
+  ROLE_APPROVAL
+  MULTI_APPROVER
+  SEQUENTIAL_APPROVAL
+  PARALLEL_APPROVAL
+}
+
+/// A snapshot of the policy + rules captured at workflow start. Stored as
+/// JSON so a running workflow is immune to later policy edits. The
+/// `policySnapshot` is immutable for the lifetime of the workflow.
+model ApprovalWorkflow {
+  id             String                 @id @default(uuid()) @db.Uuid
+  dealId         String                 @db.Uuid
+  organizationId String                 @db.Uuid
+  policyId       String                 @db.Uuid
+  status         ApprovalWorkflowStatus @default(NOT_STARTED)
+  policySnapshot Json
+  startedAt      DateTime?
+  completedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  deal         Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policy       ApprovalPolicy     @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  requests     ApprovalRequest[]
+  decisions    ApprovalDecision[]
+
+  @@unique([dealId])
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+enum ApprovalWorkflowStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+/// A single approval request assigned to a specific user within a workflow.
+/// Sequential approvals use the `sequence` field; parallel approvals share
+/// the same sequence number (or are grouped by the evaluator).
+model ApprovalRequest {
+  id             String                @id @default(uuid()) @db.Uuid
+  workflowId     String                @db.Uuid
+  dealId         String                @db.Uuid
+  organizationId String                @db.Uuid
+  approverUserId String                @db.Uuid
+  approverRole   String?
+  sequence       Int                   @default(0)
+  required       Boolean               @default(true)
+  status         ApprovalRequestStatus @default(PENDING)
+  reason         String?
+  dueAt          DateTime?
+  respondedAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  workflow     ApprovalWorkflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  deal         Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  approver     User               @relation("ApprovalRequestApprover", fields: [approverUserId], references: [id], onDelete: Restrict)
+  decisions    ApprovalDecision[]
+
+  @@unique([workflowId, approverUserId])
+  @@index([workflowId])
+  @@index([organizationId, status])
+  @@index([approverUserId, status])
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+  EXPIRED
+  CANCELLED
+}
+
+/// An immutable record of an explicit approval or rejection decision.
+model ApprovalDecision {
+  id             String               @id @default(uuid()) @db.Uuid
+  requestId      String               @db.Uuid
+  workflowId     String               @db.Uuid
+  dealId         String               @db.Uuid
+  organizationId String               @db.Uuid
+  actorUserId    String               @db.Uuid
+  decision       ApprovalDecisionType
+  reason         String?
+  decidedAt      DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+
+  request      ApprovalRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  workflow     ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  deal         Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User             @relation("ApprovalDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([requestId])
+  @@index([workflowId])
+  @@index([organizationId])
+  @@index([actorUserId])
+}
+
+enum ApprovalDecisionType {
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Settlement & Reconciliation (Phase 8)
+//
+// Settlement: a deal's external settlement lifecycle. Linked to exactly one
+// Aegis deal. Status moves through a deterministic state machine via the
+// settlement service. Provider is pluggable (Canton real / mock/sandbox).
+// Reconciliation: compares Aegis settlement facts against provider state.
+// ---------------------------------------------------------------------------
+
+enum SettlementProvider {
+  CANTON
+  MOCK
+}
+
+enum SettlementStatus {
+  CREATED
+  SUBMITTING
+  SUBMITTED
+  PENDING
+  SETTLED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum ReconciliationStatus {
+  PENDING
+  MATCHED
+  MISMATCHED
+  FAILED
+  RESOLVED
+}
+
+/// A settlement record for a deal. Exactly one settlement per deal (enforced
+/// by unique constraint). Organization-scoped. Amount/currency mirror the
+/// deal's economics. Provider reference is set after submission.
+model Settlement {
+  id                     String             @id @default(uuid()) @db.Uuid
+  organizationId         String             @db.Uuid
+  dealId                 String             @db.Uuid
+  provider               SettlementProvider @default(MOCK)
+  providerReference      String?
+  externalTransactionId  String?
+  status                 SettlementStatus   @default(CREATED)
+  amount                 Decimal            @db.Decimal(28, 8)
+  currency               String
+  assetIdentifier        String?
+  initiatedByUserId      String             @db.Uuid
+  initiatedAt            DateTime           @default(now())
+  submittedAt            DateTime?
+  completedAt            DateTime?
+  failedAt               DateTime?
+  failureReason          String?
+  metadata               Json?
+  /// Idempotency (create): SHA-256 of the client-supplied idempotency key,
+  /// unique per organization so a retried create returns the original settlement.
+  /// `idempotencyPayloadHash` is the SHA-256 fingerprint of the authorized
+  /// request body — replaying the same key with a materially different payload
+  /// is rejected. Both are never exposed on the wire.
+  idempotencyKeyHash     String?            @db.VarChar(64)
+  idempotencyPayloadHash String?            @db.VarChar(64)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal           Deal                   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  initiatedBy    User                   @relation("SettlementInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  transitions    SettlementTransition[]
+  reconciliation Reconciliation?
+
+  @@unique([dealId])
+  @@unique([organizationId, providerReference])
+  @@unique([organizationId, idempotencyKeyHash])
+  @@index([organizationId, status])
+  @@index([organizationId, dealId])
+  @@index([provider, providerReference])
+  @@index([status, updatedAt])
+}
+
+/// Append-only lifecycle ledger for a Settlement. Status only moves through
+/// rows here; requestId carries idempotency (mirrors DealStateTransition).
+model SettlementTransition {
+  id             String           @id @default(uuid()) @db.Uuid
+  settlementId   String           @db.Uuid
+  dealId         String           @db.Uuid
+  organizationId String           @db.Uuid
+  requestId      String?
+  transitionType String
+  fromStatus     SettlementStatus
+  toStatus       SettlementStatus
+  reason         String?
+  actorUserId    String?          @db.Uuid
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+
+  settlement   Settlement   @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("SettlementTransitionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([settlementId, requestId, toStatus])
+  @@index([settlementId, createdAt])
+  @@index([dealId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([settlementId, fromStatus, toStatus])
+  @@index([actorUserId])
+}
+
+/// Result of comparing Aegis settlement state against provider state.
+/// Deterministic rules: amount, currency, reference, completion state.
+model Reconciliation {
+  id                String               @id @default(uuid()) @db.Uuid
+  organizationId    String               @db.Uuid
+  dealId            String               @db.Uuid
+  settlementId      String               @db.Uuid
+  expectedAmount    Decimal              @db.Decimal(28, 8)
+  actualAmount      Decimal?             @db.Decimal(28, 8)
+  expectedCurrency  String
+  actualCurrency    String?
+  expectedReference String?
+  actualReference   String?
+  expectedState     String
+  actualState       String?
+  status            ReconciliationStatus @default(PENDING)
+  mismatchReason    String?
+  checkedAt         DateTime             @default(now())
+  resolvedAt        DateTime?
+  resolvedByUserId  String?              @db.Uuid
+  resolutionReason  String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  settlement   Settlement   @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  resolvedBy   User?        @relation("ReconciliationResolver", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([settlementId])
+  @@unique([dealId])
+  @@index([organizationId, status])
+  @@index([dealId])
+  @@index([status, checkedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Deal Intelligence (Phase 9)
+//
+// One run = one advisory analysis of a deal's authorized context (or a Q&A
+// against that same context). Runs are append-only history: status moves
+// PENDING -> COMPLETED | FAILED. `inputHash` is the backend-computed SHA-256
+// of the canonical, key-sorted context JSON that was sent; a COMPLETED run
+// with the same inputHash is replayed instead of re-analyzed. Results are
+// advisory only and NEVER mutate authoritative deal/approval/settlement
+// state.
+// ---------------------------------------------------------------------------
+
+enum DealIntelligenceRunStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model DealIntelligenceRun {
+  id                String                    @id @default(uuid()) @db.Uuid
+  organizationId    String                    @db.Uuid
+  dealId            String                    @db.Uuid
+  requestedByUserId String                    @db.Uuid
+  status            DealIntelligenceRunStatus @default(PENDING)
+  /// AI provider name reported by the model (e.g. "deterministic").
+  provider          String?
+  modelVersion      String?
+  /// Backend analysis protocol version sent as `client_version`.
+  analysisVersion   String?
+  /// SHA-256 of the canonical sorted context payload. Deduplication key.
+  inputHash         String                    @db.VarChar(64)
+  /// The validated, advisory intelligence result (null while PENDING/FAILED).
+  result            Json?
+  /// Lightweight projection for list views (confidence + counts).
+  confidenceSummary Json?
+  /// Stable AI_* error code when the run FAILED.
+  errorCode         String?
+  createdAt         DateTime                  @default(now())
+  completedAt       DateTime?
+  updatedAt         DateTime                  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation(fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([dealId, createdAt])
+  @@index([organizationId, status])
+  @@index([dealId, status])
+  @@index([inputHash])
+}
+
+enum DealOptimizationRunStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+/// Append-only history of deal route-optimization runs (Phase 10). Results
+/// are advisory: they never gate or mutate authoritative deal/settlement state.
+model DealOptimizationRun {
+  id                String                        @id @default(uuid()) @db.Uuid
+  organizationId    String                        @db.Uuid
+  dealId            String                        @db.Uuid
+  requestedByUserId String                        @db.Uuid
+  status            DealOptimizationRunStatus     @default(PENDING)
+  /// The quantum operation performed: "OPTIMIZE" or "COMPARE".
+  operation         String                        @default("OPTIMIZE")
+  /// Backend orchestration protocol version.
+  optimizationVersion String?
+  /// The solver actually used, as reported by the service ("classical",
+  /// "simulator", "real_hardware").
+  solver            String?
+  /// The upstream quantum service problem id (reference for cross-service
+  /// forensics); null while PENDING/FAILED.
+  problemId         String?
+  /// SHA-256 of the canonical problem payload. Deduplication key.
+  inputHash         String                        @db.VarChar(64)
+  /// The validated, advisory optimization/comparison result.
+  result            Json?
+  /// Lightweight projection for list views (feasibility + counts).
+  metrics           Json?
+  /// Stable QUANTUM_* error code when the run FAILED.
+  errorCode         String?
+  createdAt         DateTime                      @default(now())
+  completedAt       DateTime?
+  updatedAt         DateTime                      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation(fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([dealId, createdAt])
+  @@index([organizationId, status])
+  @@index([dealId, status])
+  @@index([inputHash])
+}

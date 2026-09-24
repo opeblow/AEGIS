@@ -1,0 +1,294 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --ink-950: #0b0d10;
+  --ink-925: #0e1115;
+  --ink-900: #12151a;
+  --ink-875: #161a20;
+  --ink-850: #1a1f26;
+  --ink-800: #20262e;
+  --ink-700: #2b333d;
+
+  --paper: #f0f2f4;
+  --muted: #a6aeba;
+  --faint: #6e7784;
+  --faintest: #4b545f;
+
+  --accent: #34d399;
+  --accent-strong: #10b981;
+  --accent-deep: #059669;
+  --accent-ink: #0a2419;
+  --accent-soft: #0e2d20;
+
+  --amber: #f5b14c;
+  --amber-deep: #b45309;
+  --amber-soft: #33240f;
+
+  --rose: #fb7185;
+  --rose-deep: #be123c;
+  --rose-soft: #331522;
+
+  --steel: #7dd3fc;
+  --steel-soft: #0c2433;
+
+  --line: color-mix(in oklab, var(--paper) 7%, transparent);
+  --line-strong: color-mix(in oklab, var(--paper) 14%, transparent);
+
+  --bg: var(--ink-950);
+  --fg: var(--paper);
+
+  --surface: var(--ink-900);
+  --surface-raised: var(--ink-875);
+  --surface-sunken: var(--ink-925);
+
+  --radius-lg: 0.625rem;
+  --radius-md: 0.5rem;
+  --radius-sm: 0.375rem;
+}
+
+@theme inline {
+  --color-ink-950: var(--ink-950);
+  --color-ink-925: var(--ink-925);
+  --color-ink-900: var(--ink-900);
+  --color-ink-875: var(--ink-875);
+  --color-ink-850: var(--ink-850);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-faintest: var(--faintest);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-amber: var(--amber);
+  --color-amber-deep: var(--amber-deep);
+  --color-amber-soft: var(--amber-soft);
+
+  --color-rose: var(--rose);
+  --color-rose-deep: var(--rose-deep);
+  --color-rose-soft: var(--rose-soft);
+
+  --color-steel: var(--steel);
+  --color-steel-soft: var(--steel-soft);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+}
+
+html {
+  color-scheme: dark;
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 28%, transparent);
+  color: var(--paper);
+}
+
+* {
+  border-color: var(--line);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- utilities ---------- */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.mono {
+  font-family: var(--font-geist-mono), ui-monospace, "SFMono-Regular",
+    Menlo, monospace;
+}
+
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.hairline {
+  border-color: var(--line);
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.panel {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.panel-raise {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+/* Subtle radial sheen reserved for the very top of surfaces — kept flat and
+   restrained so it never reads as glassmorphism. */
+.sheen {
+  background-image: radial-gradient(
+    120% 100% at 50% 0%,
+    color-mix(in oklab, var(--paper) 3.5%, transparent),
+    transparent 55%
+  );
+}
+
+.input-well {
+  background-color: var(--ink-925);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-700);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--ink-700) 80%, var(--paper) 12%);
+}
+
+@keyframes aegis-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aegis-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes aegis-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-fade-in {
+  animation: aegis-fade-in 0.18s ease-out;
+}
+.animate-scale-in {
+  animation: aegis-scale-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-pulse-soft {
+  animation: aegis-pulse 1.6s ease-in-out infinite;
+}
+
+/* Skeleton shimmer — flat, faint, never gaudy. */
+@keyframes aegis-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--ink-850) 0%,
+    var(--ink-800) 40%,
+    var(--ink-850) 80%
+  );
+  background-size: 400px 100%;
+  animation: aegis-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pids/
+*.pid
+
+# Coverage
+coverage/
+
+# Prisma
+prisma/*.db
+
+# Phase 6 document storage (local-disk dev adapter root)
+.document-storage/
+
+# Server verification artifacts
+_srv.*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE — keep editors happy but not the repo
+.idea/
+.vscode/
+*.swp

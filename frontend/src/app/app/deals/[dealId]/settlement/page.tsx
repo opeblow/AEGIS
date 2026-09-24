@@ -1,0 +1,182 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useState } from "react";
+import { Landmark, RefreshCcw, Send, ShieldCheck } from "lucide-react";
+import { useApi } from "@/lib/hooks";
+import { post } from "@/lib/api";
+import { fmtDate, fmtMoney, timeAgo, uuid } from "@/lib/format";
+import { humanLabel, toneFor } from "@/lib/status";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, KeyValues } from "@/components/ui/data";
+import { StatusChip } from "@/components/ui/badge";
+import { Empty, Loading } from "@/components/ui/atoms";
+import { useToast } from "@/components/ui/toast";
+import type { PublicSettlement, PublicReconciliation } from "@/lib/types";
+
+export default function DealSettlement() {
+  const params = useParams<{ dealId: string }>();
+  const dealId = params.dealId;
+  const { push } = useToast();
+
+  const settlementApi = useApi<{ settlements: PublicSettlement[]; total: number }>(
+    dealId ? `/deals/${dealId}/settlement` : null,
+  );
+  const reconApi = useApi<{ reconciliations: PublicReconciliation[]; total: number }>(
+    dealId ? `/deals/${dealId}/reconciliation` : null,
+  );
+
+  const settlements = settlementApi.data?.settlements ?? [];
+  const recons = reconApi.data?.reconciliations ?? [];
+
+  const [initiating, setInitiating] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const initiate = async () => {
+    setInitiating(true);
+    setError(null);
+    try {
+      const res = await post<{ settlement: PublicSettlement }>(`/deals/${dealId}/settlement`, {
+        idempotencyKey: uuid(),
+      });
+      push({ kind: "success", title: "Settlement initiated", message: `${res.settlement.provider}` });
+      settlementApi.reload();
+      reconApi.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to initiate settlement.");
+    } finally {
+      setInitiating(false);
+    }
+  };
+
+  const submit = async (s: PublicSettlement) => {
+    setSubmittingId(s.id);
+    setError(null);
+    try {
+      await post(`/deals/${dealId}/settlement/${s.id}/submit`, {});
+      push({ kind: "success", title: "Submitted to provider", message: s.provider });
+      settlementApi.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Provider submit failed.");
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const reconcile = async (s: PublicSettlement) => {
+    setError(null);
+    try {
+      await post(`/deals/${dealId}/settlement/${s.id}/reconcile`, { requestId: uuid() });
+      push({ kind: "success", title: "Reconciliation requested" });
+      reconApi.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reconciliation failed.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      {error && (
+        <p className="rounded-lg border border-rose/25 bg-rose-soft px-3 py-2 text-sm text-rose">{error}</p>
+      )}
+
+      <div className="flex items-center justify-between">
+        <CardHeader
+          title="Settlement"
+          subtitle="Verified provider state. Watch channels are only shown after the provider confirms."
+          icon={<Landmark className="size-4 text-faint" />}
+        />
+        <Button
+          size="sm"
+          icon={<Send className="size-4" />}
+          loading={initiating}
+          onClick={initiate}
+        >
+          Initiate settlement
+        </Button>
+      </div>
+
+      {settlementApi.loading ? (
+        <Loading rows={6} />
+      ) : settlements.length === 0 ? (
+        <Empty
+          title="No settlement initiated"
+          message="Initiate payment to the counterparty through the clearing provider."
+          icon={<Landmark className="size-5" />}
+          action={
+            <Button size="sm" icon={<Send className="size-4" />} loading={initiating} onClick={initiate}>
+              Initiate
+            </Button>
+          }
+        />
+      ) : (
+        settlements.map((s) => (
+          <Card key={s.id}>
+            <CardHeader
+              title={`${s.provider} settlement`}
+              subtitle={s.providerReference ? `Provider ref ${s.providerReference}` : undefined}
+              icon={<ShieldCheck className="size-4 text-faint" />}
+              right={
+                <StatusChip label={humanLabel(s.status)} tone={toneFor.settlement(s.status)} dot />
+              }
+            />
+            <div className="grid grid-cols-2 gap-4 border-t border-line p-4 lg:grid-cols-4">
+              <KeyValues
+                values={[
+                  ["Amount", fmtMoney(s.amount, s.currency)],
+                  ["Initiated", fmtDate(s.initiatedAt)],
+                  ["Submitted", s.submittedAt ? fmtDate(s.submittedAt) : "—"],
+                  ["Completed", s.completedAt ? fmtDate(s.completedAt) : "—"],
+                ]}
+              />
+            </div>
+            <div className="border-t border-line p-4 pt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {["CREATED", "PENDING"].includes(s.status) && (
+                  <Button size="sm" variant="secondary" loading={submittingId === s.id} onClick={() => submit(s)}>
+                    Submit to provider
+                  </Button>
+                )}
+                {toneFor.settlement(s.status) !== "neutral" && ["SETTLED", "PENDING"].includes(s.status) && (
+                  <Button size="sm" variant="ghost" icon={<RefreshCcw className="size-4" />} onClick={() => reconcile(s)}>
+                    Reconcile
+                  </Button>
+                )}
+                <p className="ml-auto text-[11px] text-faintest">Updated {timeAgo(s.updatedAt)}</p>
+              </div>
+            </div>
+          </Card>
+        ))
+      )}
+
+      <Card>
+        <CardHeader title="Reconciliation" subtitle="Provider-side cross-check of settled state" icon={<RefreshCcw className="size-4 text-faint" />} />
+        <div className="border-t border-line" />
+        {reconApi.loading ? (
+          <Loading rows={3} className="p-4" />
+        ) : recons.length === 0 ? (
+          <div className="p-4"><Empty title="Nothing to reconcile yet" message="Settlements that have been submitted will surface here." icon={<RefreshCcw className="size-5" />} /></div>
+        ) : (
+          <div className="flex flex-col gap-3 p-4">
+            {recons.map((r) => (
+              <div key={r.id} className="rounded-xl border border-line bg-ink-925 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-paper">{humanLabel(r.status)}</span>
+                  <StatusChip size="xs" label={humanLabel(r.status)} tone={toneFor.reconciliation(r.status)} />
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <p className="text-faintest">Expected <span className="mono text-muted">{fmtMoney(r.expectedAmount, r.expectedCurrency)}</span></p>
+                  <p className="text-faintest">Actual {r.actualAmount ? <span className="mono text-muted">{fmtMoney(r.actualAmount, r.actualCurrency ?? r.expectedCurrency)}</span> : <span className="text-faintest">—</span>}</p>
+                </div>
+                {r.mismatchReason && (
+                  <p className="mt-2 rounded-lg border border-amber/25 bg-amber-soft px-3 py-2 text-xs text-amber">{r.mismatchReason}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

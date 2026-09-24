@@ -134,7 +134,7 @@ function Landing() {
         </svg>
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-6">
+      <div className="relative mx-auto flex min-h-screen w-full min-w-0 max-w-7xl flex-col px-4 sm:px-6">
         {/* Header */}
         <header className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
@@ -143,7 +143,7 @@ function Landing() {
             </span>
             <span className="text-base font-semibold tracking-tight text-paper">Aegis</span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm">
+          <nav className="flex min-w-0 items-center gap-3 text-sm sm:gap-6">
             <a href="#capabilities" className="hidden text-muted transition-colors hover:text-paper sm:block">Capabilities</a>
             <a href="#cannon" className="hidden text-muted transition-colors hover:text-paper sm:block">Cannon</a>
             <a href="#oneswap" className="hidden text-muted transition-colors hover:text-paper sm:block">OneSwap</a>
@@ -160,17 +160,17 @@ function Landing() {
         </header>
 
         {/* Hero */}
-        <main className="flex flex-1 flex-col items-center pb-24 pt-12 text-center sm:pt-16">
+        <main className="flex w-full min-w-0 flex-1 flex-col items-center pb-24 pt-12 text-center sm:pt-16">
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft/50 px-3.5 py-1.5 text-xs font-medium text-accent">
             <span className="size-1.5 rounded-full bg-accent animate-pulse-soft" />
             Now with OneSwap liquidity integration
           </div>
 
-          <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[1.06] tracking-tight text-paper sm:text-6xl lg:text-7xl">
+          <h1 className="mt-5 w-full max-w-4xl text-3xl font-semibold leading-[1.06] tracking-tight text-paper sm:text-5xl md:text-6xl lg:text-7xl">
             Deals that settle on<br />
             <span className="bg-gradient-to-r from-accent to-steel bg-clip-text text-transparent">verifiable state.</span>
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+          <p className="mt-6 w-full max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
             Aegis runs negotiation, approval, settlement and liquidity as one
             audited transaction record — written for institutions that cannot
             afford a dashboard that lies.

@@ -11,7 +11,10 @@ import {
   getSwapQuote,
   executeSwap,
   getSwapStatus,
+  cancelSwap,
+  recordSwapDeposit,
   getPoolInfo,
+  getPoolTicker,
   listPools,
   listTokens,
   addLiquidity,
@@ -23,6 +26,7 @@ import {
   poolIdParamsSchema,
   quoteRequestBodySchema,
   swapExecuteBodySchema,
+  swapDepositBodySchema,
   liquidityAddBodySchema,
   liquidityRemoveBodySchema,
 } from "./oneswap.schemas.js";
@@ -101,21 +105,40 @@ const oneswapRoutes: FastifyPluginCallback = (
     },
   );
 
-  // Live pool/token metadata from the official OneSwap Canton SDK.
-  for (const resource of ["tokens", "pools"] as const) {
-    app.get(
-      `/deals/:dealId/oneswap/${resource}`,
-      { preHandler: [app.authenticate], config: { rateLimit: limits.read } },
-      async (request) => {
-        const { dealId } = validate(dealIdParamsSchema, request.params, "params");
-        const viewer = await resolveDealViewer(dealId, actorUserId(request));
-        await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
-        return resource === "tokens" ? listTokens() : listPools();
-      },
-    );
-  }
+  // ── Cancel an unfunded swap ─────────────────────────────────────────────────
+  app.post(
+    "/deals/:dealId/oneswap/swap/:swapId/cancel",
+    {
+      preHandler: [app.authenticate, app.requireCsrf],
+      config: { rateLimit: limits.write },
+    },
+    async (request) => {
+      const { dealId, swapId } = validate(swapIdParamsSchema, request.params, "params");
+      const userId = actorUserId(request);
+      const viewer = await resolveDealViewer(dealId, userId);
+      await authorize(request, viewer.organizationId, Permissions.OneSwapExecute);
+      return cancelSwap(viewer, dealId, swapId, userId, requestMeta(request));
+    },
+  );
 
-  // ── Pool info ──────────────────────────────────────────────────────────────
+  // ── Record swap deposit (Canton transfer funded via Metatarz wallet) ───────
+  app.post(
+    "/deals/:dealId/oneswap/swap/:swapId/deposit",
+    {
+      preHandler: [app.authenticate, app.requireCsrf],
+      config: { rateLimit: limits.write },
+    },
+    async (request) => {
+      const { dealId, swapId } = validate(swapIdParamsSchema, request.params, "params");
+      const body = validate(swapDepositBodySchema, request.body, "body");
+      const userId = actorUserId(request);
+      const viewer = await resolveDealViewer(dealId, userId);
+      await authorize(request, viewer.organizationId, Permissions.OneSwapExecute);
+      return recordSwapDeposit(viewer, dealId, swapId, body, userId, requestMeta(request));
+    },
+  );
+
+  // ── Pool info + live ticker ────────────────────────────────────────────────
   app.get(
     "/deals/:dealId/oneswap/pool/:poolId",
     {
@@ -130,6 +153,35 @@ const oneswapRoutes: FastifyPluginCallback = (
       return getPoolInfo(viewer, dealId, poolId);
     },
   );
+
+  app.get(
+    "/deals/:dealId/oneswap/pool/:poolId/ticker",
+    {
+      preHandler: [app.authenticate],
+      config: { rateLimit: limits.read },
+    },
+    async (request) => {
+      const { dealId, poolId } = validate(poolIdParamsSchema, request.params, "params");
+      const userId = actorUserId(request);
+      const viewer = await resolveDealViewer(dealId, userId);
+      await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
+      return getPoolTicker(viewer, dealId, poolId, userId, requestMeta(request), viewer.organizationId);
+    },
+  );
+
+  // Live pool/token metadata from the official OneSwap Canton SDK.
+  for (const resource of ["tokens", "pools"] as const) {
+    app.get(
+      `/deals/:dealId/oneswap/${resource}`,
+      { preHandler: [app.authenticate], config: { rateLimit: limits.read } },
+      async (request) => {
+        const { dealId } = validate(dealIdParamsSchema, request.params, "params");
+        const viewer = await resolveDealViewer(dealId, actorUserId(request));
+        await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
+        return resource === "tokens" ? listTokens() : listPools();
+      },
+    );
+  }
 
   // ── Add liquidity ──────────────────────────────────────────────────────────
   app.post(

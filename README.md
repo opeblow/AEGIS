@@ -59,6 +59,32 @@ quantum computing/    FastAPI route-optimization service
 
 The backend API is the authority for accounts, organizations, deals, offers, approvals, documents, settlement workflow, and audit records. The Python services receive scoped inputs from the backend and return advisory results.
 
+## Project structure
+
+```text
+AEGIS/
+├── .github/workflows/       CI checks and tagged GitHub releases
+├── ai-ml/                   FastAPI deal intelligence service
+│   ├── app/                 API, schemas, pipelines, and analysis services
+│   └── tests/
+├── backend/                 Fastify API and Prisma data layer
+│   ├── prisma/              Schema, migrations, and seed data
+│   ├── src/modules/         Auth, deals, approvals, documents, settlement
+│   └── tests/               Unit and integration tests
+├── docs/media/              Product screenshots and animated GIFs
+├── frontend/                Next.js web application
+│   ├── public/
+│   └── src/                 App routes, components, and shared libraries
+├── quantum computing/       FastAPI route optimization service
+│   ├── app/                 Optimization models, solvers, and API
+│   └── tests/
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+└── SECURITY.md
+```
+
 ## Requirements
 
 - Node.js 20 or newer and npm

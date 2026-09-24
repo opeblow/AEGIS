@@ -71,7 +71,7 @@ At higher scale, create a durable analysis job and return a run identifier promp
 
 ### OneSwap mutation
 
-Today the API validates and authorizes a swap request, persists an operation row with a payload-bound idempotency key, then calls the official OneSwap SDK. `userRef` is derived as a stable hash of the Aegis user and organization; OneSwap permits only one open swap per user reference and exposes lookup/recovery. Aegis can recover a provider-accepted open intent after a lost response and stores its provider reference and latest returned state. Calls still run synchronously in the API process rather than a durable worker, and provider terminal-state reconciliation/webhooks are not implemented. The browser wallet deposit step is also not implemented. LP add/remove calls are explicitly unsupported by the published SDK and return 501.
+Today the API validates and authorizes a swap request, persists an operation row with a payload-bound idempotency key, then calls the official OneSwap SDK. `userRef` is derived as a stable hash of the Aegis user and organization; OneSwap permits only one open swap per user reference and exposes lookup/recovery. Aegis can recover a provider-accepted open intent after a lost response and stores its provider reference and latest returned state. Users fund the swap's `depositParty` from the non-custodial Metatarz wallet; the returned Canton `update_id` is verified against the Metatarz EVM shim before the deposit is recorded (`POST …/deposit`). Cancel and pool tickers are live through the SDK. Calls still run synchronously in the API process rather than a durable worker, and provider terminal-state reconciliation/webhooks are not implemented. LP add/remove calls are explicitly unsupported by the published SDK and return 501.
 
 For production writes, persist a command before dispatch with a unique key scoped to tenant, operation, and client idempotency key. Store a canonical payload hash and reject same-key/different-payload requests. A worker dispatches with the same stable provider idempotency key, persists provider references and transitions, and reconciles provider webhooks or polling. Authenticate and deduplicate webhooks. If the provider lacks idempotency, query/reconcile by a stable operation reference before any retry and move ambiguous operations to manual review rather than risking a duplicate. Never infer finality merely from “request accepted.”
 
@@ -160,9 +160,9 @@ Alert on user-impacting symptoms and exhausted recovery capacity, not every tran
 
 The following must be implemented, configured, or evidenced before claiming production-scale reliability:
 
-- durable OneSwap worker dispatch, concurrency/timeout recovery tests, a Canton wallet deposit flow, and provider terminal-state reconciliation;
+- durable OneSwap worker dispatch, concurrency/timeout recovery tests, and provider terminal-state reconciliation (wallet-deposit funding now exists via Metatarz; the Onchain detection/`deposit_detected` reconciliation still needs verification against a real network);
 - OneSwap-supported liquidity write contract/API and wallet-authorized add/remove transaction flow;
-- Canton settlement adapter, supported token/contract integration, party mapping, and signer/custody model;
+- live verification of the Canton settlement adapter (Metatarz external-party signing + `update_id` receipt verification) on a real Canton test/main network, including party mapping and whitelisting;
 - transactional outbox and durable queue for external and long-running work where required;
 - concurrency-safe deduplication of Canton analysis jobs, plus a production model/provider configuration and privacy review;
 - shared distributed rate limiting for multi-replica API deployments;

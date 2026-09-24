@@ -26,6 +26,10 @@
 <p align="center"><em>One transaction record. From first offer to verified outcome.</em></p>
 
 <p align="center">
+  <img src="docs/media/landing-page.gif" alt="Aegis landing page" width="720" />
+</p>
+
+<p align="center">
   <strong>Metatarz wallet</strong> — non-custodial Canton signing for OneSwap funding and settlement. Aegis never holds your key.
 </p>
 <p align="center">

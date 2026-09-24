@@ -74,7 +74,7 @@ function OnboardingForm() {
             <g fill="#bbc7d1" fontFamily="Arial,sans-serif" fontSize="11" textAnchor="middle"><text x="42" y="158">Negotiate</text><text x="154" y="99">Approve</text><text x="271" y="191">Settle</text><text x="379" y="100">Liquidity</text><text x="479" y="158">Audit</text></g>
           </svg>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-faint"><span className="rounded-full border border-line px-3 py-1.5">Private deal rooms</span><span className="rounded-full border border-line px-3 py-1.5">Policy-based approvals</span><span className="rounded-full border border-line px-3 py-1.5">Auditable settlement</span></div>
+        <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-faint"><span className="rounded-full border border-line px-3 py-1.5">Private deal rooms</span><span className="rounded-full border border-line px-3 py-1.5">Policy-based approvals</span><span className="rounded-full border border-line px-3 py-1.5">Auditable settlement</span><span className="rounded-full border border-accent/30 px-3 py-1.5">Metatarz wallet signing</span></div>
       </section>
       <section className="mx-auto w-full min-w-0 max-w-md lg:max-w-none">
       <Link href="/" className="mb-7 flex items-center justify-center gap-2.5 lg:justify-start">

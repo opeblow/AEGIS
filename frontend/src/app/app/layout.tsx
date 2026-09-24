@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { SessionProvider, useSession } from "@/lib/session";
 import { ToastProvider } from "@/components/ui/toast";
+import { CantonWalletProvider } from "@/lib/canton/context";
 
 function Gate({ children }: { children: ReactNode }) {
   const { loading, user, activeOrg } = useSession();
@@ -31,7 +32,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
       <ToastProvider>
-        <Gate>{children}</Gate>
+        <CantonWalletProvider>
+          <Gate>{children}</Gate>
+        </CantonWalletProvider>
       </ToastProvider>
     </SessionProvider>
   );

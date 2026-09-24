@@ -93,6 +93,7 @@ model User {
   reconciliationsResolved Reconciliation[]       @relation("ReconciliationResolver")
   dealIntelligenceRuns    DealIntelligenceRun[]
   dealOptimizationRuns    DealOptimizationRun[]
+  oneswapOperations       OneSwapOperation[]     @relation("OneSwapActor")
 
   @@index([email])
   @@index([status])
@@ -111,12 +112,13 @@ model Organization {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  members         OrganizationMember[]
-  invitations     OrganizationInvitation[]
-  securityEvents  SecurityEvent[]
-  roles           Role[]
-  deals           Deal[]
-  dealTransitions DealStateTransition[]
+  members           OrganizationMember[]
+  invitations       OrganizationInvitation[]
+  securityEvents    SecurityEvent[]
+  roles             Role[]
+  deals             Deal[]
+  oneswapOperations OneSwapOperation[]
+  dealTransitions   DealStateTransition[]
 
   counterpartiesOutgoing     OrganizationCounterparty[]  @relation("CounterpartyPrimary")
   counterpartiesIncoming     OrganizationCounterparty[]  @relation("CounterpartySecondary")
@@ -402,6 +404,7 @@ model Deal {
 
   dealIntelligenceRuns DealIntelligenceRun[]
   dealOptimizationRuns DealOptimizationRun[]
+  oneswapOperations    OneSwapOperation[]
 
   @@unique([organizationId, reference])
   @@unique([organizationId, idempotencyKeyHash])
@@ -1332,32 +1335,32 @@ enum DealOptimizationRunStatus {
 /// Append-only history of deal route-optimization runs (Phase 10). Results
 /// are advisory: they never gate or mutate authoritative deal/settlement state.
 model DealOptimizationRun {
-  id                String                        @id @default(uuid()) @db.Uuid
-  organizationId    String                        @db.Uuid
-  dealId            String                        @db.Uuid
-  requestedByUserId String                        @db.Uuid
-  status            DealOptimizationRunStatus     @default(PENDING)
+  id                  String                    @id @default(uuid()) @db.Uuid
+  organizationId      String                    @db.Uuid
+  dealId              String                    @db.Uuid
+  requestedByUserId   String                    @db.Uuid
+  status              DealOptimizationRunStatus @default(PENDING)
   /// The quantum operation performed: "OPTIMIZE" or "COMPARE".
-  operation         String                        @default("OPTIMIZE")
+  operation           String                    @default("OPTIMIZE")
   /// Backend orchestration protocol version.
   optimizationVersion String?
   /// The solver actually used, as reported by the service ("classical",
   /// "simulator", "real_hardware").
-  solver            String?
+  solver              String?
   /// The upstream quantum service problem id (reference for cross-service
   /// forensics); null while PENDING/FAILED.
-  problemId         String?
+  problemId           String?
   /// SHA-256 of the canonical problem payload. Deduplication key.
-  inputHash         String                        @db.VarChar(64)
+  inputHash           String                    @db.VarChar(64)
   /// The validated, advisory optimization/comparison result.
-  result            Json?
+  result              Json?
   /// Lightweight projection for list views (feasibility + counts).
-  metrics           Json?
+  metrics             Json?
   /// Stable QUANTUM_* error code when the run FAILED.
-  errorCode         String?
-  createdAt         DateTime                      @default(now())
-  completedAt       DateTime?
-  updatedAt         DateTime                      @updatedAt
+  errorCode           String?
+  createdAt           DateTime                  @default(now())
+  completedAt         DateTime?
+  updatedAt           DateTime                  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -1367,4 +1370,35 @@ model DealOptimizationRun {
   @@index([organizationId, status])
   @@index([dealId, status])
   @@index([inputHash])
+}
+
+/// Durable, tenant-scoped record for external OneSwap side effects. The row is
+/// created before contacting OneSwap so retries can recover a provider intent
+/// after a network timeout without issuing an unrelated second operation.
+model OneSwapOperation {
+  id                     String   @id @default(uuid()) @db.Uuid
+  organizationId         String   @db.Uuid
+  dealId                 String   @db.Uuid
+  requestedByUserId      String   @db.Uuid
+  operationType          String
+  status                 String   @default("CREATING")
+  providerReference      String?
+  providerStatus         String?
+  idempotencyKeyHash     String   @db.VarChar(64)
+  idempotencyPayloadHash String   @db.VarChar(64)
+  request                Json
+  providerResponse       Json?
+  lastErrorCode          String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deal         Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("OneSwapActor", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKeyHash])
+  @@unique([organizationId, providerReference])
+  @@index([organizationId, dealId, status])
+  @@index([providerReference])
+  @@index([requestedByUserId, createdAt])
 }

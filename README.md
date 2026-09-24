@@ -40,6 +40,7 @@
 
 - [Product tour](#product-tour)
 - [What Aegis does](#what-aegis-does)
+- [Roles: Metatarz, Canton, and OneSwap](#roles-metatarz-canton-and-oneswap)
 - [Canton deal intelligence](#canton-deal-intelligence)
 - [OneSwap and liquidity integration](#oneswap-and-liquidity-integration)
 - [Architecture at a glance](#architecture-at-a-glance)
@@ -88,6 +89,17 @@ Aegis carries one visual language from the landing page into sign-in, account cr
 - **Audit and access:** organization-scoped authorization, participant checks, CSRF protections for browser mutations, and security events for sensitive actions.
 
 The backend is authoritative for accounts, organizations, deal state, and persisted workflow records. Intelligence, route recommendations, and provider quotes are advisory inputs. Aegis does not treat a model response or quote as an approval.
+
+## Roles: Metatarz, Canton, and OneSwap
+
+Aegis orchestrates the pieces; it does not replace them. Four distinct roles combine into one accountable flow:
+
+- **Metatarz (Canton wallet) — the signing role.** Metatarz is the user's non-custodial Canton wallet. It holds the private key in the user's environment and signs CC and CIP-56 transfers when a swap or settlement needs funding. Aegis connects to it from the browser over EIP-1193/EIP-6963 (detected like MetaMask), and the backend verifies each signed transfer's `update_id` against Metatarz's EVM shim before recording a deposit. Aegis never holds or touches a private key.
+- **Canton (network) — the settlement role.** Canton is the ledger where value actually exists and moves. OneSwap's pools and swap intents operate on Canton, and every transfer produces a Canton `update_id` that becomes part of Aegis's transaction record. The wallet page reads on-ledger balances through the Metatarz shim. (The product also uses the name *Canton* for its deal-intelligence experience — see [Canton deal intelligence](#canton-deal-intelligence).)
+- **OneSwap + liquidity — the pricing and liquidity role.** OneSwap supplies quotes, pool data, tickers, and swap intents, and returns the `depositParty` a swap must be funded from. Liquidity add/remove operations move an organization's funds into or out of pools. OneSwap is the liquidity engine; the actual transfer of value happens on Canton.
+- **Aegis — the orchestration and record role.** Aegis authorizes who may act, turns a deal into a routable settlement, obtains a quote, asks the user to sign the funding transfer in Metatarz, verifies the on-ledger result, and appends everything to one accountable record.
+
+**How the pieces fit together in one flow:** OneSwap quotes a route → the browser opens Metatarz and the user signs a Canton transfer to the returned `depositParty` → the backend verifies the resulting `update_id` against the Metatarz EVM shim → OneSwap observes the deposit on-chain and finalizes the swap on Canton → Aegis records the outcome and reconciles the deal. Aegis supplies the policy and the record; Metatarz supplies the keys; Canton supplies the ledger; OneSwap supplies the liquidity and pricing.
 
 ## Canton deal intelligence
 

@@ -130,7 +130,7 @@ export async function initiateSettlement(
       data: {
         organizationId,
         dealId,
-        provider: "MOCK",
+        provider: getSettlementProvider().name,
         status: "CREATED",
         amount: deal.notionalAmount,
         currency: deal.currency,

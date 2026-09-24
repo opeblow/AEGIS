@@ -1,7 +1,7 @@
 # Aegis
 
 <p align="center">
-  <img src="frontend/src/app/favicon.ico" alt="Aegis mark" width="64" />
+  <img src="frontend/src/app/icon.svg" alt="Aegis app icon" width="64" />
 </p>
 
 <h3 align="center">Move high-stakes deals forward. Keep every decision accountable.</h3>

@@ -528,3 +528,88 @@ export interface ApiErrorBody {
 export interface Cancelable {
   signal?: AbortSignal;
 }
+
+/* ------------------------------------------------------------------ *
+ * OneSwap on Canton + Metatarz wallet (Phase 11)
+ * ------------------------------------------------------------------ */
+
+export interface OneSwapQuote {
+  [key: string]: unknown;
+  toAmount?: string;
+  toAmountWithoutFee?: string;
+  priceImpact?: string;
+  fee?: string;
+  poolId?: string;
+  inSymbol?: string;
+  outSymbol?: string;
+  isValid?: boolean;
+  error?: string | null;
+}
+
+export interface OneSwapToken {
+  symbol: string;
+  name: string | null;
+  address?: string | null;
+  decimals?: number | null;
+}
+
+export interface OneSwapPool {
+  id?: string;
+  poolId?: string;
+  token0Symbol?: string;
+  token1Symbol?: string;
+  inSymbol?: string;
+  outSymbol?: string;
+  active?: boolean;
+  fee?: number | null;
+  [key: string]: unknown;
+}
+
+export interface OneSwapPoolTicker {
+  symbol?: string;
+  lastPrice?: number | string;
+  priceChangePercent24?: number | string;
+  volume24?: number | string;
+  bidPrice?: number | string;
+  askPrice?: number | string;
+  [key: string]: unknown;
+}
+
+export type OneSwapSwapStatus =
+  | "requested"
+  | "created"
+  | "quote_requested"
+  | "quote_generated"
+  | "deposit_pending"
+  | "deposit_detected"
+  | "pending_execution"
+  | "executed"
+  | "settled"
+  | "canceled"
+  | "expired"
+  | string;
+
+export interface OneSwapSwap {
+  id?: string;
+  swapId?: string;
+  userRef?: string;
+  poolId?: string;
+  poolType?: string;
+  inSymbol?: string;
+  outSymbol?: string;
+  amountIn?: number | string;
+  minOut?: number | string | null;
+  deadline?: string | null;
+  status: OneSwapSwapStatus;
+  depositParty?: string;
+  txId?: string | null;
+  fee?: number | null;
+  createdTime?: number | string;
+  [key: string]: unknown;
+}
+
+export interface CantonTokenBalanceView {
+  symbol: string;
+  address: string;
+  balance: string;
+}

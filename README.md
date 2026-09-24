@@ -29,7 +29,7 @@
 
 - [Product tour](#product-tour)
 - [What Aegis does](#what-aegis-does)
-- [Cannon deal intelligence](#cannon-deal-intelligence)
+- [Canton deal intelligence](#canton-deal-intelligence)
 - [OneSwap and liquidity integration](#oneswap-and-liquidity-integration)
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Project structure](#project-structure)
@@ -58,32 +58,32 @@ Aegis carries one visual language from the landing page into sign-in, account cr
 
 - **Negotiation:** private deal rooms, versioned offers, counteroffers, participants, documents, and requirements.
 - **Approvals:** organization permissions and approval workflows record decisions and state changes.
-- **Cannon deal intelligence:** Aegis assembles an authorized deal context and requests advisory analysis or question answering. Results are versioned records; they do not approve or change a deal.
+- **Canton deal intelligence:** Aegis assembles an authorized deal context and requests advisory analysis or question answering. Results are versioned records; they do not approve or change a deal.
 - **Route optimization:** compare candidate settlement routes against explicit constraints. The local solver is a simulator, not quantum hardware.
 - **Settlement and reconciliation:** track settlement requests and reconcile provider status with deal state.
-- **OneSwap operations:** request quotes, initiate swaps, inspect swap/pool status, and add or remove liquidity through the configured OneSwap client.
+- **OneSwap on Canton:** the backend now uses OneSwap's official TypeScript SDK for quotes, swap intents, swap status, pool details, and token/pool discovery. A swap intent still requires a user-authorized Canton transfer to its returned deposit party.
 - **Audit and access:** organization-scoped authorization, participant checks, CSRF protections for browser mutations, and security events for sensitive actions.
 
 The backend is authoritative for accounts, organizations, deal state, and persisted workflow records. Intelligence, route recommendations, and provider quotes are advisory inputs. Aegis does not treat a model response or quote as an approval.
 
-## Cannon deal intelligence
+## Canton deal intelligence
 
-The product calls its deal-intelligence experience **Cannon**. In the repository, that experience is implemented by the backend AI module and the internal `ai-ml/` FastAPI service:
+The product calls its deal-intelligence experience **Canton**. In the repository, that experience is implemented by the backend AI module and the internal `ai-ml/` FastAPI service:
 
 1. An authenticated user requests an analysis or asks a question about a deal.
 2. The API resolves the deal participant and organization permissions, then builds a scoped context from authorized records.
 3. The backend calls the private AI service, validates the response shape and deal identity, and stores analysis runs with status, model metadata, and a context hash.
 4. The UI presents the result as guidance. Deal changes still require the relevant workflow action and permission.
 
-The current model provider defaults to `mock` (`aegis-mock-v1`) so local development and CI do not depend on a hosted model. Configure and validate a supported hosted provider before describing model-backed Cannon analysis as production-enabled. The landing page also describes counterparty matching and playbook-grounded clause suggestions; those are product direction, not a claim that every such capability is implemented in the current service.
+The current model provider defaults to `mock` (`aegis-mock-v1`) so local development and CI do not depend on a hosted model. Configure and validate a supported hosted provider before describing model-backed Canton analysis as production-enabled. The landing page also describes counterparty matching and playbook-grounded clause suggestions; those are product direction, not a claim that every such capability is implemented in the current service.
 
 ## OneSwap and liquidity integration
 
 The backend exposes authenticated, deal-scoped routes for OneSwap quotes, swap execution/status, pool information, and liquidity add/remove. Read operations require the organization read permission; operations that can initiate an external action require the `oneswap:execute` permission. Mutating browser calls also pass the backend's CSRF/origin protections. The service records security events with the deal, actor, request correlation, and operation details.
 
-`getOneSwapClient()` chooses the mock client unless both `ONESWAP_API_URL` and `ONESWAP_API_KEY` are configured. The HTTP client calls the provider's quote, swap, status, pool, and liquidity endpoints with a bounded request timeout. Set real provider credentials only in the deployment secret manager; verify endpoint contracts, supported chains, wallet-signing responsibilities, and settlement finality with the provider before production use.
+`getOneSwapClient()` uses the official `@oneswap/sdk`; it never falls back to a mock. The API key stays on the backend. The published SDK supports quotes, swap intents/status, token discovery, and pool reads. It does not expose liquidity add/remove operations; those routes return `501` instead of inventing a provider response. OneSwap API access and the Canton wallet transfer experience are not configured in this repository yet.
 
-The present `requestId` is audit correlation, not a durable idempotency key for provider writes. A client retry after a provider accepted an operation but before Aegis received its response could initiate a duplicate operation. Before enabling real-money or otherwise irreversible writes, add a durable operation record and state machine, bind a client idempotency key to a payload hash, pass provider idempotency keys where supported, and reconcile uncertain outcomes before retrying. See [Production readiness](#production-readiness) and the [system design](docs/architecture.md).
+Swap writes persist a tenant/deal/user-scoped operation record and bind the client idempotency key to a request hash. Aegis can recover a provider-accepted open intent using OneSwap's stable user reference and rejects mismatched retries. Verify OneSwap's concurrency/idempotency contract and add focused replay, mismatch, timeout, and provider callback tests before irreversible production use. See [Production readiness](#production-readiness) and the [system design](docs/architecture.md).
 
 ## Architecture at a glance
 
@@ -131,7 +131,7 @@ Idempotency is a property of each operation, not a blanket guarantee that every 
 
 - Deal, offer, document, requirement, and settlement creation paths use hashed idempotency keys and payload fingerprints in relevant flows. Unique database constraints make the key scope durable; a reused key with a different payload is a conflict.
 - State transitions use version checks and unique transition request identifiers to reject stale or duplicate transitions.
-- Cannon analysis hashes a canonical authorized context and can replay a completed matching result. The current implementation can still create duplicate pending runs under concurrent identical requests because there is no unique constraint on the input hash.
+- Canton analysis hashes a canonical authorized context and can replay a completed matching result. The current implementation can still create duplicate pending runs under concurrent identical requests because there is no unique constraint on the input hash.
 - OneSwap write correlation IDs are currently recorded for audit; they do not yet provide exactly-once provider execution. Use the safeguards described above before retrying provider mutations automatically.
 
 No distributed system can promise exactly-once execution across Aegis, a network, and an independent provider without cooperation from the provider. A production implementation should make commands idempotent, record state durably, and reconcile external outcomes.
@@ -213,7 +213,7 @@ Open [http://localhost:3000](http://localhost:3000). The API listens on port `40
 
 Use the checked-in `.env.example` files as the configuration reference. At minimum, set backend database URLs, session/auth secrets, allowed frontend origins, and both internal service URLs. The integration test setup requires `DATABASE_URL`, `AEGIS_TEST_DATABASE_URL`, `AI_SERVICE_URL`, and `QUANTUM_SERVICE_URL`; CI defines all four explicitly.
 
-For live OneSwap integration, configure `ONESWAP_API_URL` and `ONESWAP_API_KEY`. For model-backed Cannon, configure the AI service's provider and its provider-specific credentials. Keep secrets out of source control and logs. Never point `npm run db:test:setup` at a development or production database: it force-resets the configured test database.
+For OneSwap, configure `ONESWAP_API_KEY` and `ONESWAP_ENVIRONMENT=devnet` for development (`mainnet` is required in production). Obtain the key from OneSwap and keep it in the deployment secret manager. The live Canton settlement adapter and OneSwap liquidity write API are not implemented/configured yet. `SETTLEMENT_PROVIDER=canton` fails explicitly rather than routing to the in-memory test provider. Never point `npm run db:test:setup` at a development or production database: it force-resets the configured test database.
 
 ## Verification
 
@@ -247,10 +247,11 @@ From each Python service directory, run its test suite with the repository virtu
 
 ## Production readiness
 
-The repository contains CI checks and working local service adapters. That is not, by itself, evidence that a live deployment is production-ready or sized for millions of users. Before production traffic or irreversible provider operations, close and verify at least these items:
+The repository contains CI checks and provider adapters, but live Canton settlement is not yet available and the OneSwap live API key and wallet transfer flow are not configured. That is not evidence of production readiness or capacity for millions of users. Before production traffic or irreversible provider operations, close and verify at least these items:
 
 - Configure a real, supported AI model provider; test privacy, retention, output quality, cost ceilings, and failure modes.
-- Validate the live OneSwap contract, wallet authorization/signing boundaries, transaction finality, provider idempotency, webhook authentication, and uncertain-result reconciliation.
+- Implement Canton settlement against the configured Canton participant/validator, token standard, sender/receiver party model, and user-signing/custody design; test on a Canton test network.
+- Obtain OneSwap integration access, implement the Canton wallet deposit flow, and verify provider idempotency, terminal-state reconciliation, and the supported liquidity add/remove interface with OneSwap.
 - Add durable async work handling (queue plus transactional outbox/inbox) for long-running or retryable external operations.
 - Deploy PostgreSQL with managed high availability, tested point-in-time recovery, bounded connection pooling, migration rollback/forward procedures, and documented RPO/RTO.
 - Configure distributed rate limits and abuse controls appropriate to a multi-instance deployment; the current API security plugin uses an in-process Fastify limiter by default.

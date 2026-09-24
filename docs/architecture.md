@@ -19,7 +19,7 @@ Aegis handles multi-organization deal data and coordinates changes across a rela
 | PostgreSQL | Authoritative application records and constraints | Repository schema alone does not configure managed HA, backups, failover, or connection pooling. |
 | `ai-ml/` FastAPI | Advisory deal analysis and questions | The configured model provider defaults to `mock`; long-running work is currently synchronous at the API boundary. |
 | `quantum computing/` FastAPI | Route optimization | A local simulator is not quantum hardware. Keep this service advisory to authoritative deal state. |
-| OneSwap adapter | Quote, swap, pool, and liquidity provider calls | A mock adapter is selected unless both provider URL and key are configured. Current write request IDs are audit correlation, not durable idempotency. |
+| OneSwap adapter | Uses the official `@oneswap/sdk` for Canton quotes, swap intents/status, pools, and tokens | An API key is required at request time. A created swap returns a Canton deposit party; a wallet transfer is still required. The published SDK exposes no liquidity add/remove methods, and those routes return 501. |
 
 ### Recommended production topology
 
@@ -63,7 +63,7 @@ Start with one write region and a highly available database deployment. Add read
 
 The transactional outbox is a target pattern. It prevents the classic dual-write failure where the database commits but a separate queue publish is lost, or a message publishes for a transaction that later rolls back.
 
-### Cannon / deal intelligence
+### Canton / deal intelligence
 
 Today the backend builds an authorized context, hashes a canonical representation, calls the AI service synchronously, validates its response, and records a `PENDING` then `COMPLETED` or `FAILED` run. Matching completed contexts can be replayed. Identical requests racing before either creates a pending row can still create duplicate work; the schema has an index but no unique input-hash constraint.
 
@@ -71,7 +71,7 @@ At higher scale, create a durable analysis job and return a run identifier promp
 
 ### OneSwap mutation
 
-Today the API validates and authorizes a swap/liquidity request, calls the provider, then records a security event containing the returned reference and request correlation. If the provider accepts an operation but the response is lost, an automatic retry can repeat the mutation; if audit persistence fails after provider acceptance, the response path can also be ambiguous.
+Today the API validates and authorizes a swap request, persists an operation row with a payload-bound idempotency key, then calls the official OneSwap SDK. `userRef` is derived as a stable hash of the Aegis user and organization; OneSwap permits only one open swap per user reference and exposes lookup/recovery. Aegis can recover a provider-accepted open intent after a lost response and stores its provider reference and latest returned state. Calls still run synchronously in the API process rather than a durable worker, and provider terminal-state reconciliation/webhooks are not implemented. The browser wallet deposit step is also not implemented. LP add/remove calls are explicitly unsupported by the published SDK and return 501.
 
 For production writes, persist a command before dispatch with a unique key scoped to tenant, operation, and client idempotency key. Store a canonical payload hash and reject same-key/different-payload requests. A worker dispatches with the same stable provider idempotency key, persists provider references and transitions, and reconciles provider webhooks or polling. Authenticate and deduplicate webhooks. If the provider lacks idempotency, query/reconcile by a stable operation reference before any retry and move ambiguous operations to manual review rather than risking a duplicate. Never infer finality merely from “request accepted.”
 
@@ -87,7 +87,7 @@ For production writes, persist a command before dispatch with a unique key scope
 
 ### Idempotency coverage today
 
-Some deal, offer, document, requirement, settlement, and transition paths already use key hashes, payload hashes, uniqueness constraints, or request/version guards. The exact guarantees differ by endpoint. Cannon reuses completed analyses but has the concurrent pending-run limitation above. OneSwap mutations do not yet have durable end-to-end idempotency. Maintain an operation-by-operation idempotency table in API documentation and add tests for same-key replay, mismatched payload, concurrent duplicate delivery, timeout after provider acceptance, and webhook redelivery.
+Some deal, offer, document, requirement, settlement, and transition paths already use key hashes, payload hashes, uniqueness constraints, or request/version guards. The exact guarantees differ by endpoint. Canton reuses completed analyses but has the concurrent pending-run limitation above. OneSwap now persists organization/deal/user-scoped operation records, binds keys to request hashes, and recovers provider-accepted open swaps by stable user reference. This is not an end-to-end guarantee against every concurrent provider race: verify OneSwap's server-side concurrency/idempotency contract and add focused replay, mismatch, timeout, and provider callback tests before irreversible production use.
 
 ## 5. Capacity and scaling approach
 
@@ -160,9 +160,11 @@ Alert on user-impacting symptoms and exhausted recovery capacity, not every tran
 
 The following must be implemented, configured, or evidenced before claiming production-scale reliability:
 
-- durable OneSwap operation/idempotency records and provider outcome reconciliation;
+- durable OneSwap worker dispatch, concurrency/timeout recovery tests, a Canton wallet deposit flow, and provider terminal-state reconciliation;
+- OneSwap-supported liquidity write contract/API and wallet-authorized add/remove transaction flow;
+- Canton settlement adapter, supported token/contract integration, party mapping, and signer/custody model;
 - transactional outbox and durable queue for external and long-running work where required;
-- concurrency-safe deduplication of Cannon analysis jobs, plus a production model/provider configuration and privacy review;
+- concurrency-safe deduplication of Canton analysis jobs, plus a production model/provider configuration and privacy review;
 - shared distributed rate limiting for multi-replica API deployments;
 - deployed PostgreSQL high availability, connection budgeting, backups, point-in-time recovery, and restore/failover evidence;
 - production metrics, traces, alert policies, operational runbooks, and on-call ownership;

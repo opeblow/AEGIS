@@ -66,21 +66,21 @@ function Landing() {
     "Advisory AI is strictly separated from authoritative state",
   ];
 
-  const cannonFeatures = [
+  const cantonFeatures = [
     {
       icon: Target,
       title: "Precision deal targeting",
-      body: "Cannon's multi-dimensional scoring engine evaluates counterparty fitness across jurisdiction, risk appetite, and capital structure — surfacing the right match before you send the first offer.",
+      body: "Canton's multi-dimensional scoring engine evaluates counterparty fitness across jurisdiction, risk appetite, and capital structure — surfacing the right match before you send the first offer.",
     },
     {
       icon: Layers,
       title: "Deal structuring intelligence",
-      body: "From term sheets to final settlement conditions, Cannon structures complex multi-leg transactions with AI-generated clause suggestions grounded in your organisation's historical playbook.",
+      body: "From term sheets to final settlement conditions, Canton structures complex multi-leg transactions with AI-generated clause suggestions grounded in your organisation's historical playbook.",
     },
     {
       icon: BarChart3,
       title: "Quantum-optimised portfolios",
-      body: "Powered by our Quantum Optimization engine, Cannon solves portfolio-level allocation problems in milliseconds — selecting routes, amounts and counterparties with mathematically verifiable outcomes.",
+      body: "Powered by our Quantum Optimization engine, Canton solves portfolio-level allocation problems in milliseconds — selecting routes, amounts and counterparties with mathematically verifiable outcomes.",
     },
     {
       icon: Zap,
@@ -92,31 +92,31 @@ function Landing() {
   const oneswapFeatures = [
     {
       icon: Repeat2,
-      title: "Atomic cross-asset swaps",
-      body: "Initiate settlement-grade token swaps directly from within a deal room. OneSwap routing handles cross-chain complexity; Aegis writes the verified swap event to your ledger.",
+      title: "Canton swap intents",
+      body: "The backend uses OneSwap's official Canton SDK for quotes and swap intents. Each intent includes its deposit party and deadline; it is not treated as completed until OneSwap reports its terminal result.",
     },
     {
       icon: Droplets,
-      title: "Liquidity provisioning",
-      body: "LP positions are tracked as first-class deal objects. Monitor depth, fee accrual and impermanent loss against your deal's settlement obligations — all in one audited view.",
+      title: "Pool and token discovery",
+      body: "Read supported Canton tokens and live pool data from OneSwap. Liquidity add/remove is not enabled because the published SDK does not expose those write operations.",
     },
     {
       icon: TrendingUp,
-      title: "Real-time market depth",
-      body: "Live price quotes, slippage estimates and pool depth analytics are surfaced inside every deal. No tab switching; no stale data.",
+      title: "User-authorized transfers",
+      body: "A swap intent requires a transfer from the user's Canton wallet to OneSwap's deposit party. The wallet confirmation step and production access credentials must be configured before live use.",
     },
     {
       icon: Globe,
-      title: "Multi-chain settlement",
-      body: "OneSwap's router spans Ethereum, Arbitrum, Base and beyond. Aegis normalises the resulting settlement reference into a single verifiable state your compliance team can read.",
+      title: "Canton settlement",
+      body: "Aegis currently has a development simulator for settlement. The real Canton participant, token standard, party mapping, and signing flow still need to be connected; the app will not silently present a simulated settlement as real.",
     },
   ];
 
   const stats = [
     { label: "Deal types supported", value: "12+" },
-    { label: "Settlement providers", value: "Canton · Mock" },
-    { label: "Avg. settlement latency", value: "< 4 s" },
-    { label: "Audit events captured", value: "100%" },
+    { label: "Settlement providers", value: "Canton integration pending" },
+    { label: "OneSwap access", value: "API key required" },
+    { label: "Liquidity writes", value: "Not supported yet" },
   ];
 
   return (
@@ -145,7 +145,7 @@ function Landing() {
           </Link>
           <nav className="flex min-w-0 items-center gap-3 text-sm sm:gap-6">
             <a href="#capabilities" className="hidden text-muted transition-colors hover:text-paper sm:block">Capabilities</a>
-            <a href="#cannon" className="hidden text-muted transition-colors hover:text-paper sm:block">Cannon</a>
+            <a href="#canton" className="hidden text-muted transition-colors hover:text-paper sm:block">Canton</a>
             <a href="#oneswap" className="hidden text-muted transition-colors hover:text-paper sm:block">OneSwap</a>
             <a href="#ledger" className="hidden text-muted transition-colors hover:text-paper sm:block">Ledger</a>
             <Link
@@ -163,7 +163,7 @@ function Landing() {
         <main className="flex w-full min-w-0 flex-1 flex-col items-center pb-24 pt-12 text-center sm:pt-16">
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft/50 px-3.5 py-1.5 text-xs font-medium text-accent">
             <span className="size-1.5 rounded-full bg-accent animate-pulse-soft" />
-            Now with OneSwap liquidity integration
+            Canton integrations in progress
           </div>
 
           <h1 className="mt-5 w-full max-w-4xl text-3xl font-semibold leading-[1.06] tracking-tight text-paper sm:text-5xl md:text-6xl lg:text-7xl">
@@ -250,17 +250,17 @@ function Landing() {
             </div>
           </div>
 
-          {/* Cannon Section */}
-          <div className="mt-24 w-full" id="cannon">
+          {/* Canton Section */}
+          <div className="mt-24 w-full" id="canton">
             <div className="panel-raise overflow-hidden p-8 text-left">
               <div className="flex flex-wrap items-start justify-between gap-6">
                 <div>
-                  <p className="eyebrow text-amber">Cannon · Deal Intelligence Engine</p>
+                  <p className="eyebrow text-amber">Canton · Deal Intelligence Engine</p>
                   <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-paper">
                     From signal to signed — in one audited flow.
                   </h2>
                   <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
-                    Cannon is Aegis&apos;s embedded intelligence layer: a quantum-optimised, AI-powered
+                    Canton is Aegis&apos;s embedded intelligence layer: a quantum-optimised, AI-powered
                     engine that handles deal targeting, structuring and portfolio-level optimization —
                     while keeping every output strictly advisory and every state transition on the immutable ledger.
                   </p>
@@ -277,7 +277,7 @@ function Landing() {
                 </div>
               </div>
               <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {cannonFeatures.map((f) => (
+                {cantonFeatures.map((f) => (
                   <div key={f.title} className="rounded-xl border border-amber/10 bg-ink-900 p-5">
                     <div className="flex size-8 items-center justify-center rounded-lg border border-amber/20 bg-amber-soft/50">
                       <f.icon className="size-4 text-amber" />
@@ -295,45 +295,28 @@ function Landing() {
             <div className="panel-raise overflow-hidden p-8 text-left">
               <div className="flex flex-wrap items-start justify-between gap-6">
                 <div>
-                  <p className="eyebrow text-steel">OneSwap × Aegis · Liquidity Integration</p>
+                  <p className="eyebrow text-steel">OneSwap × Aegis · Canton integration</p>
                   <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-paper">
-                    Settlement-grade liquidity,
-                    <span className="text-steel"> inside the deal room.</span>
+                    Canton-native asset workflows,
+                    <span className="text-steel"> connected to deal state.</span>
                   </h2>
                   <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
-                    Aegis embeds OneSwap&apos;s cross-chain swap and liquidity provisioning engine
-                    directly into the deal workflow. Get real-time quotes, initiate atomic swaps and
-                    track LP positions — all written to the verifiable settlement ledger.
+                    Aegis uses OneSwap&apos;s official SDK for Canton quotes, swap intents, token
+                    discovery and pool data. A swap is not complete until the user sends funds from
+                    a Canton wallet and OneSwap reports the final outcome. OneSwap liquidity writes
+                    and Aegis&apos;s live Canton settlement adapter are not enabled yet.
                   </p>
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                      href="/app/deals"
-                      className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-lg bg-steel/10 px-4 text-sm font-medium text-steel border border-steel/20 transition-all hover:bg-steel/20"
-                    >
-                      <Repeat2 className="size-4" />
-                      Get a swap quote
-                    </Link>
-                    <Link
-                      href="/app/deals"
-                      className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-4 text-sm font-medium text-muted transition-all hover:text-paper hover:bg-ink-850"
-                    >
-                      <Droplets className="size-4" />
-                      Manage liquidity
-                    </Link>
-                  </div>
+          <p className="mt-5 text-xs text-faint">Live calls require a OneSwap API key and Canton wallet/party setup.</p>
                 </div>
                 <div className="rounded-xl border border-steel/20 bg-steel-soft/30 p-5 text-left min-w-[220px]">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-steel/70">Live pool depth</p>
-                  <p className="mt-2 text-2xl font-bold tabular text-paper">$2.4 B</p>
-                  <p className="mt-0.5 text-xs text-faint">Aggregated across 6 chains</p>
-                  <div className="mt-4 space-y-2">
-                    {["ETH/USDC", "BTC/USDT", "ARB/ETH"].map((pair, i) => (
-                      <div key={pair} className="flex items-center justify-between text-xs">
-                        <span className="text-muted">{pair}</span>
-                        <span className="font-medium text-steel">{["$812M", "$643M", "$289M"][i]}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-steel/70">Provider status</p>
+                  <p className="mt-2 text-lg font-bold text-paper">Access required</p>
+                  <ul className="mt-3 space-y-2 text-xs text-muted">
+                    <li>Quotes and swap intents: SDK ready</li>
+                    <li>Wallet deposit flow: pending</li>
+                    <li>Liquidity writes: provider API needed</li>
+                    <li>Canton settlement: adapter pending</li>
+                  </ul>
                 </div>
               </div>
               <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -413,7 +396,7 @@ function Landing() {
               Ready to run your first deal?
             </h2>
             <p className="mt-3 text-sm text-muted max-w-lg mx-auto">
-              Get access to Aegis&apos;s full deal infrastructure — Cannon, OneSwap, Quantum Optimization and the verifiable settlement ledger.
+              Get access to Aegis&apos;s deal infrastructure — Canton workflows, OneSwap quotes and swap intents, and verifiable settlement records.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
@@ -443,7 +426,7 @@ function Landing() {
             Aegis · verifiable settlement infrastructure
           </span>
           <span className="flex items-center gap-4">
-            <span>OneSwap liquidity enabled</span>
+            <span>Canton integrations in progress</span>
             <span className="size-1 rounded-full bg-faintest" />
             <span>Quantum optimization active</span>
           </span>

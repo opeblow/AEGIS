@@ -132,12 +132,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="relative z-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
 
-        <footer className="flex items-center justify-between border-t border-line px-6 py-3 text-[11px] text-faintest">
-          <span className="flex items-center gap-1.5">
+        <footer className="flex min-w-0 items-center justify-between gap-3 border-t border-line px-4 py-3 text-[11px] text-faintest sm:px-6">
+          <span className="flex min-w-0 items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-accent-strong" />
-            Aegis · verifiable settlement ledger
+            <span className="truncate">Aegis · verifiable settlement ledger</span>
           </span>
-          <span className="mono">{user?.email ?? "—"}</span>
+          <span className="mono max-w-[45%] truncate text-right">{user?.email ?? "—"}</span>
         </footer>
       </div>
 

@@ -231,7 +231,8 @@ const envSchema = z.object({
   // ------------------------------------------------------------
 
   // Settlement provider to use. "mock" for local development/testing,
-  // "canton" for real Canton integration (when available).
+  // "mock" is test/development only. "canton" currently fails closed until
+  // the ledger and token-standard adapter is configured and implemented.
   SETTLEMENT_PROVIDER: z
     .enum(["mock", "canton"], {
       errorMap: () => ({
@@ -268,6 +269,12 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(15000),
+
+  // Official OneSwap on Canton. The API key is server-only and comes from
+  // the deployment secret manager. There is no implicit mock fallback.
+  ONESWAP_API_KEY: z.string().optional().or(z.literal("")),
+  ONESWAP_ENVIRONMENT: z.enum(["mainnet", "devnet"]).default("devnet"),
+  ONESWAP_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
 
   // ------------------------------------------------------------
   // Quantum Optimization (Phase 10)
@@ -361,6 +368,17 @@ export function getEnv(): Env {
       throw new Error(
         "Refusing to start in production without QUANTUM_SERVICE_TOKEN. " +
           "The quantum optimization service must authenticate the backend.",
+      );
+    }
+    if (cachedEnv.NODE_ENV === "production" && cachedEnv.SETTLEMENT_PROVIDER !== "canton") {
+      throw new Error(
+        "Refusing to start in production with SETTLEMENT_PROVIDER=mock. " +
+          "Configure a real Canton settlement adapter before production use.",
+      );
+    }
+    if (cachedEnv.NODE_ENV === "production" && cachedEnv.ONESWAP_ENVIRONMENT !== "mainnet") {
+      throw new Error(
+        "Refusing to start production with OneSwap devnet selected. Configure ONESWAP_ENVIRONMENT=mainnet.",
       );
     }
   }

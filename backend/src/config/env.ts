@@ -231,8 +231,9 @@ const envSchema = z.object({
   // ------------------------------------------------------------
 
   // Settlement provider to use. "mock" for local development/testing,
-  // "mock" is test/development only. "canton" currently fails closed until
-  // the ledger and token-standard adapter is configured and implemented.
+  // "mock" is test/development only. "canton" uses the Metatarz
+  // non-custodial wallet flow (users sign Canton CC/CIP-56 transfers in their
+  // browser; the backend verifies the resulting update via the Metatarz RPC).
   SETTLEMENT_PROVIDER: z
     .enum(["mock", "canton"], {
       errorMap: () => ({
@@ -240,6 +241,37 @@ const envSchema = z.object({
       }),
     })
     .default("mock"),
+
+  // ------------------------------------------------------------
+  // Metatarz Canton wallet (non-custodial EVM shim for Canton)
+  // ------------------------------------------------------------
+
+  // EVM-compatible JSON-RPC endpoint exposed by the Metatarz wallet service.
+  // Mainnet: https://canton.rpc.wallet.metatarz.xyz  (chain 31337)
+  // Testnet: https://canton-testnet.rpc.wallet.metatarz.xyz (chain 30337)
+  METATARZ_RPC_URL: z
+    .string()
+    .url("METATARZ_RPC_URL must be a valid URL")
+    .default("https://canton-testnet.rpc.wallet.metatarz.xyz"),
+
+  // Canton chain id served by the Metatarz shim (used for balance/state reads
+  // and receipt verification; Canton itself is not an EVM chain).
+  METATARZ_CHAIN_ID: z.coerce
+    .number({
+      errorMap: () => ({ message: "METATARZ_CHAIN_ID must be a number" }),
+    })
+    .int()
+    .positive()
+    .default(30337),
+
+  // Per-call timeout for Metatarz RPC reads (fetch abort).
+  METATARZ_TIMEOUT_MS: z.coerce
+    .number({
+      errorMap: () => ({ message: "METATARZ_TIMEOUT_MS must be a number" }),
+    })
+    .int()
+    .positive()
+    .default(15000),
 
   // ------------------------------------------------------------
   // Deal Intelligence (Phase 9)

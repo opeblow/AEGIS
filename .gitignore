@@ -1,0 +1,85 @@
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/.env.*.local
+**/.secrets/
+**/secrets/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/$py.class
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/coverage.xml
+**/htmlcov/
+**/.venv/
+**/venv/
+/venv/
+**/env/
+**/ENV/
+**/.python-version
+
+# Node.js
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/.sveltekit/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# Local development and generated data
+**/.document-storage/
+**/.dev-mailbox/
+**/.e2e-work/
+**/_srv.*
+**/logs/
+**/*.log
+**/*.pid
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.tmp
+**/*.bak
+**/*.orig
+**/*.rej
+
+# Test and build artifacts
+**/.cache/
+**/.parcel-cache/
+**/.turbo/
+**/.output/
+**/.source-map-loader/
+**/.vite/
+**/.pytest-tmp/
+**/playwright-report/
+**/test-results/
+
+# Local diagnostics
+/backend/dbg-*.ts
+/backend/diag*.mjs
+
+# Operating-system and editor files
+**/.DS_Store
+**/Thumbs.db
+**/.idea/
+**/.vscode/
+**/.cursor/
+**/.history/
+**/.direnv/
+**/.envrc
+**/.kilo/
+**/.kilocode/
+**/*.swp
+**/*.swo

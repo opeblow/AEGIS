@@ -1,4 +1,69 @@
+import { AppError } from "../../../lib/errors/index.js";
+import {
+  getMetatarzRpcClient,
+  type MetatarzRpcClient,
+} from "./metatarz/metatarz.client.js";
 import type { SettlementProviderInterface, SettlementSubmissionPayload, SettlementProviderSubmitResult, SettlementProviderStatusResult, SettlementProviderType } from "../settlement.types.js";
+
+/**
+ * Live Canton settlement through the Metatarz non-custodial wallet.
+ *
+ * Users sign CC/CIP-56 transfers in their own browser wallet (Metatarz, which
+ * speaks EIP-1193 and returns a Canton `update_id` per transfer). The backend
+ * never holds a private key: `submit` only verifies the executed transfer's
+ * update id against the Metatarz EVM shim and records it as the settlement's
+ * external reference. `getStatus` polls the shim until the Canton update is
+ * visible on the ledger.
+ */
+export class CantonMetatarzProvider implements SettlementProviderInterface {
+  readonly name: SettlementProviderType = "CANTON";
+
+  constructor(private readonly rpc: MetatarzRpcClient = getMetatarzRpcClient()) {}
+
+  async submit(
+    _settlementId: string,
+    payload: SettlementSubmissionPayload,
+  ): Promise<SettlementProviderSubmitResult> {
+    const metadata = (payload.metadata ?? {}) as Record<string, unknown>;
+    const updateId = typeof metadata.updateId === "string" ? metadata.updateId : null;
+    if (!updateId) {
+      throw new AppError({
+        statusCode: 409,
+        code: "CANTON_SIGNATURE_REQUIRED",
+        message:
+          "A Canton transfer must be executed in the user's wallet first. " +
+          "Connect Metatarz, pay the settlement amount, then submit with the returned update id.",
+      });
+    }
+
+    const submittedAt = new Date();
+    const confirmed = await this.rpc.hasConfirmedTransaction(updateId);
+
+    return {
+      providerReference: updateId,
+      externalTransactionId: updateId,
+      status: confirmed ? "SETTLED" : "PENDING",
+      submittedAt,
+    };
+  }
+
+  async getStatus(
+    providerReference: string,
+  ): Promise<SettlementProviderStatusResult> {
+    const confirmed = await this.rpc.hasConfirmedTransaction(providerReference);
+    return {
+      providerReference,
+      externalTransactionId: providerReference,
+      status: confirmed ? "SETTLED" : "PENDING",
+      checkedAt: new Date(),
+    };
+  }
+
+  /** A signed Canton transfer cannot be revoked; local lifecycle handles cancels. */
+  async cancel(): Promise<void> {
+    return;
+  }
+}
 
 export class CantonMockProvider implements SettlementProviderInterface {
   readonly name: SettlementProviderType = "MOCK";
@@ -105,3 +170,5 @@ export class CantonMockProvider implements SettlementProviderInterface {
 }
 
 export const cantonMockProvider = new CantonMockProvider();
+export const cantonMetatarzProvider: SettlementProviderInterface =
+  new CantonMetatarzProvider();

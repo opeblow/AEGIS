@@ -25,6 +25,13 @@
 
 <p align="center"><em>One transaction record. From first offer to verified outcome.</em></p>
 
+<p align="center">
+  <strong>Metatarz wallet</strong> — non-custodial Canton signing for OneSwap funding and settlement. Aegis never holds your key.
+</p>
+<p align="center">
+  <img src="docs/media/canton-wallet.gif" alt="Canton wallet and settlement flow" width="720" />
+</p>
+
 ## Table of contents
 
 - [Product tour](#product-tour)
@@ -81,7 +88,9 @@ The current model provider defaults to `mock` (`aegis-mock-v1`) so local develop
 
 The backend exposes authenticated, deal-scoped routes for OneSwap quotes, swap execution/status, pool information, and liquidity add/remove. Read operations require the organization read permission; operations that can initiate an external action require the `oneswap:execute` permission. Mutating browser calls also pass the backend's CSRF/origin protections. The service records security events with the deal, actor, request correlation, and operation details.
 
-`getOneSwapClient()` uses the official `@oneswap/sdk`; it never falls back to a mock. The API key stays on the backend. The published SDK supports quotes, swap intents/status, token discovery, and pool reads. It does not expose liquidity add/remove operations; those routes return `501` instead of inventing a provider response. OneSwap API access and the Canton wallet transfer experience are not configured in this repository yet.
+`getOneSwapClient()` uses the official `@oneswap/sdk`; it never falls back to a mock. The API key stays on the backend. The published SDK supports quotes, swap intents/status, cancel, token discovery, pool reads, and pool tickers. It does not expose liquidity add/remove operations; those routes return `501` instead of inventing a provider response. OneSwap API access is not configured in this repository (see [Configuration](#configuration)).
+
+**Canton wallet deposit flow (Metatarz).** Users fund swaps and pay settlement from the integrated non-custodial Metatarz wallet (EIP-1193/EIP-6963, detected like MetaMask). The browser signs CC/CIP-56 transfers against an external-party `depositParty` and returns a Canton `update_id`; the backend verifies that update id against the Metatarz EVM shim (`eth_getTransactionReceipt`) before recording the deposit (`POST /oneswap/swap/:swapId/deposit`). The backend never holds a private key. Deposit destination addresses must be whitelisted in Metatarz, and OneSwap must observer the deposit on-chain before finalizing the swap.
 
 Swap writes persist a tenant/deal/user-scoped operation record and bind the client idempotency key to a request hash. Aegis can recover a provider-accepted open intent using OneSwap's stable user reference and rejects mismatched retries. Verify OneSwap's concurrency/idempotency contract and add focused replay, mismatch, timeout, and provider callback tests before irreversible production use. See [Production readiness](#production-readiness) and the [system design](docs/architecture.md).
 
@@ -213,7 +222,9 @@ Open [http://localhost:3000](http://localhost:3000). The API listens on port `40
 
 Use the checked-in `.env.example` files as the configuration reference. At minimum, set backend database URLs, session/auth secrets, allowed frontend origins, and both internal service URLs. The integration test setup requires `DATABASE_URL`, `AEGIS_TEST_DATABASE_URL`, `AI_SERVICE_URL`, and `QUANTUM_SERVICE_URL`; CI defines all four explicitly.
 
-For OneSwap, configure `ONESWAP_API_KEY` and `ONESWAP_ENVIRONMENT=devnet` for development (`mainnet` is required in production). Obtain the key from OneSwap and keep it in the deployment secret manager. The live Canton settlement adapter and OneSwap liquidity write API are not implemented/configured yet. `SETTLEMENT_PROVIDER=canton` fails explicitly rather than routing to the in-memory test provider. Never point `npm run db:test:setup` at a development or production database: it force-resets the configured test database.
+For OneSwap, configure `ONESWAP_API_KEY` and `ONESWAP_ENVIRONMENT=devnet` for development (`mainnet` is required in production). Obtain the key from OneSwap and keep it in the deployment secret manager.
+
+For Canton settlement and OneSwap deposit funding, set `SETTLEMENT_PROVIDER=canton`. Users pay through the non-custodial Metatarz wallet: connect in the app shell (or the Canton/OneSwap deal tab), whitelist the site and the recipient party addresses in Metatarz, then execute transfers. The backend verifies each returned `update_id` against the public Metatarz EVM shim before settling (`eth_getTransactionReceipt`). RPC target and timeouts are configurable via `METATARZ_RPC_URL`, `METATARZ_CHAIN_ID`, and `METATARZ_TIMEOUT_MS` (defaults: the Canton testnet shim at `https://canton-testnet.rpc.wallet.metatarz.xyz`, chain `30337`, 15 s). The mock provider is development-only and firmly refused in production. OneSwap liquidity add/remove routes return `501` — the published SDK does not expose those operations. Never point `npm run db:test:setup` at a development or production database: it force-resets the configured test database.
 
 ## Verification
 
@@ -247,11 +258,11 @@ From each Python service directory, run its test suite with the repository virtu
 
 ## Production readiness
 
-The repository contains CI checks and provider adapters, but live Canton settlement is not yet available and the OneSwap live API key and wallet transfer flow are not configured. That is not evidence of production readiness or capacity for millions of users. Before production traffic or irreversible provider operations, close and verify at least these items:
+The repository contains CI checks and provider adapters, but neither live Canton settlement on a real network nor the OneSwap API is configured/verified against live infrastructure. That is not evidence of production readiness or capacity for millions of users. Before production traffic or irreversible provider operations, close and verify at least these items:
 
 - Configure a real, supported AI model provider; test privacy, retention, output quality, cost ceilings, and failure modes.
-- Implement Canton settlement against the configured Canton participant/validator, token standard, sender/receiver party model, and user-signing/custody design; test on a Canton test network.
-- Obtain OneSwap integration access, implement the Canton wallet deposit flow, and verify provider idempotency, terminal-state reconciliation, and the supported liquidity add/remove interface with OneSwap.
+- Verify Canton settlement on a live Canton network: whitelisting, the external-party signing model, the `update_id` verification path against the Metatarz EVM shim, and sender/receiver party mapping under load and failure. The current adapter is non-custodial (backend never holds a key) but shares the Metatarz testnet assumptions described in [Configuration](#configuration).
+- Obtain OneSwap integration access and verify provider idempotency, terminal-state reconciliation, and the meaning of the `deposit_detected` status end-to-end once a wallet-funded deposit lands on-chain. Continue to treat liquidity add/remove as unsupported until the published SDK exposes them.
 - Add durable async work handling (queue plus transactional outbox/inbox) for long-running or retryable external operations.
 - Deploy PostgreSQL with managed high availability, tested point-in-time recovery, bounded connection pooling, migration rollback/forward procedures, and documented RPO/RTO.
 - Configure distributed rate limits and abuse controls appropriate to a multi-instance deployment; the current API security plugin uses an in-process Fastify limiter by default.

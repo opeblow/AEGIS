@@ -129,7 +129,14 @@ export type ErrorCode =
   | "ONESWAP_RATE_LIMITED"
   | "ONESWAP_OPERATION_UNSUPPORTED"
   | "ONESWAP_IDEMPOTENCY_CONFLICT"
-  | "ONESWAP_OPERATION_NOT_FOUND";
+  | "ONESWAP_OPERATION_NOT_FOUND"
+  // Canton / Metatarz wallet (Phase 11)
+  | "CANTON_INVALID_ADDRESS"
+  | "CANTON_INVALID_UPDATE_ID"
+  | "CANTON_SIGNATURE_REQUIRED"
+  | "CANTON_UPDATE_NOT_CONFIRMED"
+  | "METATARZ_RPC_ERROR"
+  | "METATARZ_RPC_TIMEOUT";
 
 /**
  * Application error carrying an HTTP status, a stable machine-readable code,

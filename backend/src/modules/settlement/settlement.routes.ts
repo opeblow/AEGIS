@@ -76,6 +76,15 @@ export async function settlementRoutes(app: FastifyInstance): Promise<void> {
           },
           required: ["dealId", "settlementId"],
         },
+        body: {
+          type: "object",
+          properties: {
+            updateId: { type: "string", minLength: 5, maxLength: 128 },
+            signedBy: { type: "string", maxLength: 256 },
+            senderAddress: { type: "string", maxLength: 42 },
+          },
+          additionalProperties: false,
+        },
         response: {
           200: {
             type: "object",
@@ -98,7 +107,7 @@ export async function settlementRoutes(app: FastifyInstance): Promise<void> {
       await authorize(request, viewer.organizationId, Permissions.SettlementExecute);
       const meta = extractRequestMeta(request);
 
-      const result = await submitSettlement(viewer.organizationId, settlementId, userId, meta);
+      const result = await submitSettlement(viewer.organizationId, settlementId, userId, meta, request.body);
 
       return reply.send(result);
     },

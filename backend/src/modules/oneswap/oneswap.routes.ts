@@ -12,6 +12,8 @@ import {
   executeSwap,
   getSwapStatus,
   getPoolInfo,
+  listPools,
+  listTokens,
   addLiquidity,
   removeLiquidity,
 } from "./oneswap.service.js";
@@ -37,7 +39,8 @@ import {
  * (OWNER/ADMIN only) — reusing the existing permission so no schema migration
  * is needed.
  *
- * All outputs are advisory ledger events; none mutate authoritative deal state.
+ * Swap calls create OneSwap-side Canton intents, not Aegis deal transitions.
+ * The returned deposit party must be paid by the user through a Canton wallet.
  */
 const oneswapRoutes: FastifyPluginCallback = (
   app: FastifyInstance,
@@ -94,9 +97,23 @@ const oneswapRoutes: FastifyPluginCallback = (
       const { dealId, swapId } = validate(swapIdParamsSchema, request.params, "params");
       const viewer = await resolveDealViewer(dealId, actorUserId(request));
       await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
-      return getSwapStatus(viewer, dealId, swapId, actorUserId(request));
+      return getSwapStatus(viewer, dealId, swapId);
     },
   );
+
+  // Live pool/token metadata from the official OneSwap Canton SDK.
+  for (const resource of ["tokens", "pools"] as const) {
+    app.get(
+      `/deals/:dealId/oneswap/${resource}`,
+      { preHandler: [app.authenticate], config: { rateLimit: limits.read } },
+      async (request) => {
+        const { dealId } = validate(dealIdParamsSchema, request.params, "params");
+        const viewer = await resolveDealViewer(dealId, actorUserId(request));
+        await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
+        return resource === "tokens" ? listTokens() : listPools();
+      },
+    );
+  }
 
   // ── Pool info ──────────────────────────────────────────────────────────────
   app.get(
@@ -109,10 +126,8 @@ const oneswapRoutes: FastifyPluginCallback = (
       const { dealId, poolId } = validate(poolIdParamsSchema, request.params, "params");
       const viewer = await resolveDealViewer(dealId, actorUserId(request));
       await authorize(request, viewer.organizationId, Permissions.OneSwapRead);
-      // poolId expected as "chain:address" — e.g. "ethereum:0x8ad599..."
-      const [chain = "ethereum", ...rest] = poolId.split(":");
-      const address = rest.join(":") || poolId;
-      return getPoolInfo(viewer, dealId, chain, address);
+      // poolId is the opaque identifier returned by OneSwap's Canton pool API.
+      return getPoolInfo(viewer, dealId, poolId);
     },
   );
 

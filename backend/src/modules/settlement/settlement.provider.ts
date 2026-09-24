@@ -1,6 +1,6 @@
 import { getEnv } from "../../config/env.js";
 import type { SettlementProviderInterface } from "./settlement.types.js";
-import { cantonMockProvider } from "./canton/canton.provider.js";
+import { cantonMetatarzProvider, cantonMockProvider } from "./canton/canton.provider.js";
 
 let settlementProviderInstance: SettlementProviderInterface | null = null;
 
@@ -14,9 +14,10 @@ export function getSettlementProvider(): SettlementProviderInterface {
 
   switch (providerName.toLowerCase()) {
     case "canton":
-      throw new Error(
-        "SETTLEMENT_PROVIDER=canton was selected, but the live Canton settlement adapter is not implemented. Refusing to simulate settlement.",
-      );
+      // Live non-custodial Canton settlement via Metatarz: users sign CC/CIP-56
+      // transfers in their browser and the backend verifies the update id.
+      settlementProviderInstance = cantonMetatarzProvider;
+      break;
     case "mock":
       if (env.NODE_ENV === "production") {
         throw new Error("Refusing to use the mock settlement provider in production.");

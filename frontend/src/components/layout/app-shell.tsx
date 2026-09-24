@@ -20,6 +20,7 @@ import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session";
 import { CommandDialog, useCommandPalette, getAppCommands } from "@/components/ui/command";
 import { Avatar, Kbd } from "@/components/ui/atoms";
+import { CantonWalletChip } from "@/components/layout/canton-wallet-chip";
 
 const nav = [
   { href: "/app", label: "Command Center", icon: LayoutGrid },
@@ -118,16 +119,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
             <OrgSwitcher />
           </div>
-          <button
-            onClick={() => setOpen(true)}
-            className="focus-ring flex h-8 items-center gap-2 rounded-lg border border-line bg-ink-925 px-3 text-xs text-faint transition-colors hover:border-line-strong hover:text-muted"
-          >
-            <Search className="size-3.5" />
-            <span className="hidden sm:inline">Search and run commands</span>
-            <span className="hidden items-center gap-1 sm:flex">
-              <Kbd>^K</Kbd>
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            <CantonWalletChip />
+            <button
+              onClick={() => setOpen(true)}
+              className="focus-ring flex h-8 items-center gap-2 rounded-lg border border-line bg-ink-925 px-3 text-xs text-faint transition-colors hover:border-line-strong hover:text-muted"
+            >
+              <Search className="size-3.5" />
+              <span className="hidden sm:inline">Search and run commands</span>
+              <span className="hidden items-center gap-1 sm:flex">
+                <Kbd>^K</Kbd>
+              </span>
+            </button>
+          </div>
         </header>
 
         <main className="relative z-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>

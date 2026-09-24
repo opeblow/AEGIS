@@ -14,17 +14,17 @@ export function getSettlementProvider(): SettlementProviderInterface {
 
   switch (providerName.toLowerCase()) {
     case "canton":
-      // Real Canton provider would be imported here when available
-      // For now, fall back to mock with a warning
-      console.warn(
-        "[SETTLEMENT] SETTLEMENT_PROVIDER=canton requested but real Canton provider not implemented. Using MOCK provider.",
+      throw new Error(
+        "SETTLEMENT_PROVIDER=canton was selected, but the live Canton settlement adapter is not implemented. Refusing to simulate settlement.",
       );
-      settlementProviderInstance = cantonMockProvider;
-      break;
     case "mock":
-    default:
+      if (env.NODE_ENV === "production") {
+        throw new Error("Refusing to use the mock settlement provider in production.");
+      }
       settlementProviderInstance = cantonMockProvider;
       break;
+    default:
+      throw new Error(`Unsupported settlement provider: ${providerName}`);
   }
 
   return settlementProviderInstance;

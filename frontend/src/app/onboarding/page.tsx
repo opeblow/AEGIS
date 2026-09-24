@@ -60,7 +60,7 @@ function OnboardingForm() {
           <g fill="#a4b2bf"><circle cx="18" cy="48" r="5"/><circle cx="114" cy="104" r="5"/><circle cx="188" cy="53" r="4"/><circle cx="280" cy="152" r="5"/><circle cx="361" cy="89" r="4"/><circle cx="54" cy="201" r="5"/><circle cx="169" cy="267" r="4"/><circle cx="253" cy="217" r="5"/><circle cx="343" cy="291" r="5"/><circle cx="408" cy="162" r="4"/></g>
         </svg>
       </div>
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_420px] lg:gap-16">
+      <div className="relative z-10 mx-auto flex w-full min-w-0 max-w-6xl flex-col items-center gap-10 lg:grid lg:grid-cols-[1fr_420px] lg:gap-16">
       <section className="hidden max-w-xl lg:block" aria-label="Aegis transaction flow">
         <p className="eyebrow text-accent">Aegis / transaction infrastructure</p>
         <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-paper xl:text-5xl">Start with a clear<br /><span className="bg-gradient-to-r from-accent to-steel bg-clip-text text-transparent">record of every deal.</span></h1>
@@ -76,7 +76,7 @@ function OnboardingForm() {
         </div>
         <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-faint"><span className="rounded-full border border-line px-3 py-1.5">Private deal rooms</span><span className="rounded-full border border-line px-3 py-1.5">Policy-based approvals</span><span className="rounded-full border border-line px-3 py-1.5">Auditable settlement</span></div>
       </section>
-      <section className="mx-auto w-full max-w-md lg:max-w-none">
+      <section className="mx-auto w-full min-w-0 max-w-md lg:max-w-none">
       <Link href="/" className="mb-7 flex items-center justify-center gap-2.5 lg:justify-start">
         <span className="flex size-8 items-center justify-center rounded-lg border border-accent/30 bg-accent-soft"><Orbit className="size-4 text-accent" /></span>
         <span className="text-base font-semibold tracking-tight text-paper">Aegis</span>

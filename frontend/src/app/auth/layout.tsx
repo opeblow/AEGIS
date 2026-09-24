@@ -45,7 +45,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <Link href="/" className="focus-ring absolute left-5 top-5 z-10 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-faint transition-colors hover:text-muted">
         <ChevronLeft className="size-4" /> Back
       </Link>
-      <div className="mx-auto grid min-h-screen w-full max-w-6xl flex-1 items-center gap-12 px-5 py-24 lg:grid-cols-[1fr_420px] lg:px-10">
+      <div className="mx-auto flex min-h-screen w-full min-w-0 max-w-6xl flex-1 flex-col items-center gap-12 px-5 py-24 lg:grid lg:grid-cols-[1fr_420px] lg:px-10">
         <section className="relative hidden max-w-xl lg:block" aria-label="Aegis transaction flow">
           <p className="eyebrow text-accent">Aegis / transaction infrastructure</p>
           <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-paper xl:text-5xl">Every decision<br /><span className="bg-gradient-to-r from-accent to-steel bg-clip-text text-transparent">leaves a trail.</span></h1>
@@ -63,7 +63,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
             <span className="rounded-full border border-line px-3 py-1.5">Versioned deal rooms</span><span className="rounded-full border border-line px-3 py-1.5">Policy-based approvals</span><span className="rounded-full border border-line px-3 py-1.5">Auditable settlement</span>
           </div>
         </section>
-        <section className="mx-auto w-full max-w-sm lg:max-w-none">
+        <section className="mx-auto w-full min-w-0 max-w-sm lg:max-w-none">
           <Link href="/" className="mb-7 flex items-center justify-center gap-2.5 lg:justify-start">
             <span className="flex size-8 items-center justify-center rounded-lg border border-accent/30 bg-accent-soft"><Orbit className="size-4 text-accent" /></span>
             <span className="text-base font-semibold tracking-tight text-paper">Aegis</span>

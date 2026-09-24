@@ -100,21 +100,21 @@ function Landing() {
       title: "Pool and token discovery",
       body: "Read supported Canton tokens and live pool data from OneSwap. Liquidity add/remove is not enabled because the published SDK does not expose those write operations.",
     },
-    {
+{
       icon: TrendingUp,
       title: "User-authorized transfers",
-      body: "A swap intent requires a transfer from the user's Canton wallet to OneSwap's deposit party. The wallet confirmation step and production access credentials must be configured before live use.",
+      body: "A swap intent is funded from the integrated non-custodial Metatarz wallet. You sign the transfer to OneSwap's deposit party in your own wallet; the returned Canton update id is verified against the ledger before Aegis records the deposit.",
     },
     {
       icon: Globe,
       title: "Canton settlement",
-      body: "Aegis currently has a development simulator for settlement. The real Canton participant, token standard, party mapping, and signing flow still need to be connected; the app will not silently present a simulated settlement as real.",
+      body: "Settlement is submitted to the Canton ledger through the Metatarz wallet. The backend verifies the returned update id against the Metatarz EVM shim and never fabricates a result — the development simulator exists for tests only.",
     },
   ];
 
   const stats = [
     { label: "Deal types supported", value: "12+" },
-    { label: "Settlement providers", value: "Canton integration pending" },
+    { label: "Canton settlement", value: "Live · Metatarz" },
     { label: "OneSwap access", value: "API key required" },
     { label: "Liquidity writes", value: "Not supported yet" },
   ];
@@ -161,9 +161,9 @@ function Landing() {
 
         {/* Hero */}
         <main className="flex w-full min-w-0 flex-1 flex-col items-center pb-24 pt-12 text-center sm:pt-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft/50 px-3.5 py-1.5 text-xs font-medium text-accent">
+<div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft/50 px-3.5 py-1.5 text-xs font-medium text-accent">
             <span className="size-1.5 rounded-full bg-accent animate-pulse-soft" />
-            Canton integrations in progress
+            Metatarz wallet live
           </div>
 
           <h1 className="mt-5 w-full max-w-4xl text-3xl font-semibold leading-[1.06] tracking-tight text-paper sm:text-5xl md:text-6xl lg:text-7xl">
@@ -300,22 +300,24 @@ function Landing() {
                     Canton-native asset workflows,
                     <span className="text-steel"> connected to deal state.</span>
                   </h2>
-                  <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
+<p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
                     Aegis uses OneSwap&apos;s official SDK for Canton quotes, swap intents, token
-                    discovery and pool data. A swap is not complete until the user sends funds from
-                    a Canton wallet and OneSwap reports the final outcome. OneSwap liquidity writes
-                    and Aegis&apos;s live Canton settlement adapter are not enabled yet.
+                    discovery and pool data. A swap is not complete until the user signs the
+                    deposit transfer in the integrated Metatarz wallet and OneSwap reports the
+                    final outcome. Canton settlement follows the same path — signed in the
+                    user&apos;s wallet, verified on the ledger. OneSwap liquidity writes remain
+                    unsupported by the published SDK.
                   </p>
-          <p className="mt-5 text-xs text-faint">Live calls require a OneSwap API key and Canton wallet/party setup.</p>
+          <p className="mt-5 text-xs text-faint">Goes live with a OneSwap API key and Metatarz whitelisted target addresses.</p>
                 </div>
                 <div className="rounded-xl border border-steel/20 bg-steel-soft/30 p-5 text-left min-w-[220px]">
                   <p className="text-xs font-semibold uppercase tracking-wider text-steel/70">Provider status</p>
                   <p className="mt-2 text-lg font-bold text-paper">Access required</p>
-                  <ul className="mt-3 space-y-2 text-xs text-muted">
+<ul className="mt-3 space-y-2 text-xs text-muted">
                     <li>Quotes and swap intents: SDK ready</li>
-                    <li>Wallet deposit flow: pending</li>
+                    <li>Wallet deposit flow: live · Metatarz</li>
                     <li>Liquidity writes: provider API needed</li>
-                    <li>Canton settlement: adapter pending</li>
+                    <li>Canton settlement: live · on-ledger verify</li>
                   </ul>
                 </div>
               </div>
@@ -339,6 +341,7 @@ function Landing() {
                     { label: "Deal room", icon: Landmark, color: "text-accent" },
                     { label: "OneSwap quote", icon: TrendingUp, color: "text-steel" },
                     { label: "Swap execution", icon: Repeat2, color: "text-steel" },
+                    { label: "Metatarz sign", icon: Wallet, color: "text-accent" },
                     { label: "Quantum verify", icon: Zap, color: "text-amber" },
                     { label: "AI analysis", icon: BarChart3, color: "text-amber" },
                     { label: "Ledger write", icon: Lock, color: "text-accent" },
@@ -396,7 +399,7 @@ function Landing() {
               Ready to run your first deal?
             </h2>
             <p className="mt-3 text-sm text-muted max-w-lg mx-auto">
-              Get access to Aegis&apos;s deal infrastructure — Canton workflows, OneSwap quotes and swap intents, and verifiable settlement records.
+              Get access to Aegis&apos;s deal infrastructure — Canton workflows, OneSwap quotes and swap intents, user-signed Metatarz transfers, and verifiable settlement records.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
@@ -426,7 +429,7 @@ function Landing() {
             Aegis · verifiable settlement infrastructure
           </span>
           <span className="flex items-center gap-4">
-            <span>Canton integrations in progress</span>
+<span>Canton wallet live</span>
             <span className="size-1 rounded-full bg-faintest" />
             <span>Quantum optimization active</span>
           </span>

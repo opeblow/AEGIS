@@ -42,6 +42,20 @@ export const swapExecuteBodySchema = z.object({
 }).strict();
 export type SwapExecuteBody = z.infer<typeof swapExecuteBodySchema>;
 
+/**
+ * The Canton transfer that funded a swap's deposit, executed by the user in
+ * their Metatarz wallet. `updateId` is the Canton ledger update id returned by
+ * the wallet (tx.hash from the EIP-1193 flow).
+ */
+export const swapDepositBodySchema = z.object({
+  updateId: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{4,128}$/, "updateId must be a 0x-prefixed Canton update id"),
+  senderAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  referenceNote: z.string().max(512).optional(),
+}).strict();
+export type SwapDepositBody = z.infer<typeof swapDepositBodySchema>;
+
 // The official OneSwap SDK currently exposes pool reads and swaps, but has no
 // add/remove-LP-intent method. Keep these request schemas for a future adapter;
 // route handlers return an explicit unsupported-operation error meanwhile.

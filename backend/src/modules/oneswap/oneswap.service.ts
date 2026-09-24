@@ -5,7 +5,14 @@ import type { DealViewer } from "../negotiation/participant-policy.js";
 import type { RequestMeta } from "../organizations/organization.service.js";
 import { recordSecurityEvent, SecurityEventType } from "../auth/security-events.js";
 import { getOneSwapClient } from "./oneswap.client.js";
-import type { LiquidityAddBody, LiquidityRemoveBody, QuoteRequestBody, SwapExecuteBody } from "./oneswap.schemas.js";
+import { getMetatarzRpcClient } from "../settlement/canton/metatarz/metatarz.client.js";
+import type {
+  LiquidityAddBody,
+  LiquidityRemoveBody,
+  QuoteRequestBody,
+  SwapDepositBody,
+  SwapExecuteBody,
+} from "./oneswap.schemas.js";
 
 function buildRequestId(meta: RequestMeta): string {
   return meta.requestId ?? `oneswap-${Date.now()}`;
@@ -46,6 +53,7 @@ interface OneSwapOperationRow {
   id: string;
   idempotencyPayloadHash: string;
   providerReference: string | null;
+  providerResponse: unknown | null;
   status: string;
   dealId: string;
   requestedByUserId: string;
@@ -242,6 +250,143 @@ export async function getSwapStatus(
 
 export async function getPoolInfo(_viewer: DealViewer, _dealId: string, poolId: string): Promise<{ pool: unknown }> {
   return { pool: await getOneSwapClient().getPoolInfo(poolId) };
+}
+
+/**
+ * Record the Canton transfer that funded a swap's deposit. The user executes
+ * the deposit in their Metatarz wallet (non-custodial); this endpoint verifies
+ * the returned update id exists on the ledger before recording it for audit
+ * and reconciliation with OneSwap's own `deposit_detected` status.
+ */
+export async function recordSwapDeposit(
+  viewer: DealViewer,
+  dealId: string,
+  swapId: string,
+  body: SwapDepositBody,
+  userId: string,
+  meta: RequestMeta,
+): Promise<{ swap: unknown; depositUpdateId: string; verified: boolean }> {
+  const client = getOneSwapClient();
+  const operations = await prisma.$queryRaw<OneSwapOperationRow[]>`
+    SELECT "id", "idempotencyPayloadHash", "providerReference", "providerResponse", "status", "dealId", "requestedByUserId"
+    FROM "OneSwapOperation"
+    WHERE "providerReference" = ${swapId}
+      AND "organizationId" = ${viewer.organizationId}::uuid
+      AND "dealId" = ${dealId}::uuid
+    LIMIT 1
+  `;
+  const operation = operations[0];
+  if (!operation) {
+    throw new AppError({ statusCode: 404, code: "ONESWAP_OPERATION_NOT_FOUND", message: "OneSwap operation not found for this deal." });
+  }
+
+  const swap = await client.getSwapStatus(swapId);
+
+  let verified = false;
+  try {
+    verified = await getMetatarzRpcClient().hasConfirmedTransaction(body.updateId);
+  } catch {
+    verified = false;
+  }
+  if (!verified) {
+    throw new AppError({
+      statusCode: 422,
+      code: "CANTON_UPDATE_NOT_CONFIRMED",
+      message: "The reported Canton update id could not be confirmed on the ledger.",
+    });
+  }
+
+  const providerResponse = {
+    ...((operation.providerResponse ?? {}) as Record<string, unknown>),
+    deposit: {
+      updateId: body.updateId,
+      senderAddress: body.senderAddress ?? null,
+      verifiedAt: new Date().toISOString(),
+      swapStatus: swap.status,
+    },
+  };
+  await prisma.$executeRaw`
+    UPDATE "OneSwapOperation"
+    SET "providerResponse" = ${JSON.stringify(providerResponse)}::jsonb,
+        "updatedAt" = NOW()
+    WHERE "id" = ${operation.id}::uuid
+  `;
+  await recordSecurityEvent({
+    type: SecurityEventType.ONESWAP_SWAP_DEPOSIT_RECORDED,
+    userId,
+    organizationId: viewer.organizationId,
+    metadata: {
+      dealId,
+      operationId: operation.id,
+      swapId,
+      updateId: body.updateId,
+      senderAddress: body.senderAddress ?? null,
+      requestId: buildRequestId(meta),
+    },
+  }).catch(() => undefined);
+
+  return { swap, depositUpdateId: body.updateId, verified };
+}
+
+/**
+ * Cancel an OneSwap swap that has not yet been funded (OneSwap returns the
+ * swap unchanged once it has received a deposit / reached a terminal state).
+ */
+export async function cancelSwap(
+  viewer: DealViewer,
+  dealId: string,
+  swapId: string,
+  userId: string,
+  meta: RequestMeta,
+): Promise<{ swap: unknown }> {
+  const operations = await prisma.$queryRaw<OneSwapOperationRow[]>`
+    SELECT "id", "idempotencyPayloadHash", "providerReference", "status", "dealId", "requestedByUserId"
+    FROM "OneSwapOperation"
+    WHERE "providerReference" = ${swapId}
+      AND "organizationId" = ${viewer.organizationId}::uuid
+      AND "dealId" = ${dealId}::uuid
+    LIMIT 1
+  `;
+  const operation = operations[0];
+  if (!operation) {
+    throw new AppError({ statusCode: 404, code: "ONESWAP_OPERATION_NOT_FOUND", message: "OneSwap operation not found for this deal." });
+  }
+
+  const swap = await getOneSwapClient().cancelSwap(swapId);
+  await prisma.$executeRaw`
+    UPDATE "OneSwapOperation"
+    SET "providerStatus" = ${swap.status}, "status" = ${swap.status},
+        "providerResponse" = ${JSON.stringify(swap)}::jsonb,
+        "updatedAt" = NOW()
+    WHERE "id" = ${operation.id}::uuid
+  `;
+  await recordSecurityEvent({
+    type: SecurityEventType.ONESWAP_SWAP_CANCELLED,
+    userId,
+    organizationId: viewer.organizationId,
+    metadata: { dealId, operationId: operation.id, swapId, status: swap.status, requestId: buildRequestId(meta) },
+  }).catch(() => undefined);
+
+  return { swap };
+}
+
+/** Live pool market data: USD price, 24h change, and volume from OneSwap. */
+export async function getPoolTicker(
+  _viewer: DealViewer,
+  _dealId: string,
+  poolId: string,
+  userId: string,
+  meta: RequestMeta,
+  organizationId: string,
+): Promise<{ ticker: unknown }> {
+  const ticker = await getOneSwapClient().getPoolTicker(poolId);
+  await recordSecurityEvent({
+    type: SecurityEventType.ONESWAP_POOL_TICKER_QUERIED,
+    userId,
+    organizationId,
+    metadata: { poolId, requestId: buildRequestId(meta) },
+  }).catch(() => undefined);
+  return { ticker };
 }
 
 export async function listPools(): Promise<{ pools: unknown[] }> {

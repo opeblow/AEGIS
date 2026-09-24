@@ -3,6 +3,7 @@ import {
   OneSwapError,
   type Pool,
   type PoolDetail,
+  type PoolTicker,
   type QuoteResult,
   type Swap,
   type Token,
@@ -33,7 +34,9 @@ export interface OneSwapClient {
   createSwap(params: OneSwapSwapParams): Promise<Swap>;
   getSwapStatus(swapId: string): Promise<Swap>;
   getOpenSwap(userRef: string): Promise<Swap | null>;
+  cancelSwap(swapId: string): Promise<Swap>;
   getPoolInfo(poolId: string): Promise<PoolDetail>;
+  getPoolTicker(poolId: string): Promise<PoolTicker>;
   getPools(): Promise<Pool[]>;
   getTokens(): Promise<Token[]>;
 }
@@ -62,8 +65,16 @@ class OfficialOneSwapClient implements OneSwapClient {
     return this.call(() => this.client.swaps.getOpenSwap(userRef));
   }
 
+  async cancelSwap(swapId: string): Promise<Swap> {
+    return this.call(() => this.client.swaps.cancel(swapId));
+  }
+
   async getPoolInfo(poolId: string): Promise<PoolDetail> {
     return this.call(() => this.client.pools.get(poolId));
+  }
+
+  async getPoolTicker(poolId: string): Promise<PoolTicker> {
+    return this.call(() => this.client.pools.getTicker(poolId));
   }
 
   async getPools(): Promise<Pool[]> {

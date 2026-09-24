@@ -45,7 +45,7 @@
 **/.e2e-work/
 **/_srv.*
 **/logs/
-**/*.log
+**/*.log*
 **/*.pid
 **/*.db
 **/*.sqlite

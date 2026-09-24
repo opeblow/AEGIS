@@ -55,11 +55,23 @@
 
 Aegis carries one visual language from the landing page into sign-in, account creation, and onboarding: a dark canvas, faint network geometry around the edges, emerald-to-steel highlights, and a transaction-flow illustration. On wide screens the artwork supports the main task; on mobile the form stays readable and the decoration moves behind the content.
 
-| Deal flow | Account creation |
-|---|---|
-| ![Deal flow overview](docs/media/deal-flow.gif) | ![Aegis account creation](docs/media/sign-up.gif) |
-| **Secure sign-in** | **Organization onboarding** |
-| ![Aegis sign-in](docs/media/sign-in.gif) | ![Aegis onboarding](docs/media/onboarding.gif) |
+### Landing page
+![Aegis landing page](docs/media/landing-page.gif)
+
+### Deal flow
+![Aegis deal-flow illustration](docs/media/deal-flow.gif)
+
+### Canton wallet
+![Canton wallet and OneSwap funding on a deal](docs/media/canton-wallet.gif)
+
+### Sign in
+![Aegis sign-in](docs/media/sign-in.gif)
+
+### Account creation
+![Aegis account creation](docs/media/sign-up.gif)
+
+### Organization onboarding
+![Aegis onboarding](docs/media/onboarding.gif)
 
 ## What Aegis does
 

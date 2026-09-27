@@ -875,25 +875,33 @@ export async function reviewDocument(
   const toStatus: DocumentStatus =
     body.decision === "ACCEPT" ? "ACCEPTED" : "REJECTED";
 
-  const replay = await prisma.dealDocumentTransition.findFirst({
-    where: { documentId: doc.id, requestId: body.requestId, toStatus },
-    orderBy: { createdAt: "asc" },
-  });
-  if (replay) {
-    return {
-      document: toPublicDocument(doc),
-      transition: toPublicDocumentTransition(replay),
-      replay: true,
-    };
+  // Idempotent replay is keyed on an explicit requestId. Without one, the
+  // lookup is skipped entirely: an absent requestId must not match a prior
+  // transition, or a requestId-less review would silently no-op on a document
+  // that has already moved on instead of hitting the legal-transition guard.
+  if (body.requestId) {
+    const replay = await prisma.dealDocumentTransition.findFirst({
+      where: { documentId: doc.id, requestId: body.requestId, toStatus },
+      orderBy: { createdAt: "asc" },
+    });
+    if (replay) {
+      return {
+        document: toPublicDocument(doc),
+        transition: toPublicDocumentTransition(replay),
+        replay: true,
+      };
+    }
   }
 
   return prisma
     .$transaction(async (tx) => {
-      const txReplay = await tx.dealDocumentTransition.findFirst({
-        where: { documentId: doc.id, requestId: body.requestId, toStatus },
-        orderBy: { createdAt: "asc" },
-      });
-      if (txReplay) return { kind: "replay" as const, transition: txReplay };
+      if (body.requestId) {
+        const txReplay = await tx.dealDocumentTransition.findFirst({
+          where: { documentId: doc.id, requestId: body.requestId, toStatus },
+          orderBy: { createdAt: "asc" },
+        });
+        if (txReplay) return { kind: "replay" as const, transition: txReplay };
+      }
 
       requireDocumentLegalTransition(doc.status, toStatus);
       await assertNotExpired(tx, doc, actorUserId);

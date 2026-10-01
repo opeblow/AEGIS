@@ -20,7 +20,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, mono, ...props }, ref) => (
-    <input ref={ref} className={cn(fieldBase, "h-9", mono && "font-mono tabular", className)} {...props} />
+    <input ref={ref} className={cn(fieldBase, "h-10 sm:h-9", mono && "font-mono tabular", className)} {...props} />
   ),
 );
 Input.displayName = "Input";
@@ -42,14 +42,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, options, placeholder, defaultValue, value, ...props }, ref) => {
     const hasValue = value !== undefined && String(value) !== "";
     return (
-      <div className="relative">
+      <div className="relative w-full">
         <select
           ref={ref}
           value={value}
           defaultValue={defaultValue}
           className={cn(
             fieldBase,
-            "h-9 appearance-none pr-8",
+            "h-10 appearance-none pr-8 sm:h-9",
             (hasValue || defaultValue !== undefined) && "text-paper",
             className,
           )}

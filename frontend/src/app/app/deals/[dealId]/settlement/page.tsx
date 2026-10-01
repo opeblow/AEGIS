@@ -85,21 +85,21 @@ export default function DealSettlement() {
         <p className="rounded-lg border border-rose/25 bg-rose-soft px-3 py-2 text-sm text-rose">{error}</p>
       )}
 
-      <div className="flex items-center justify-between">
-        <CardHeader
-          title="Settlement"
-          subtitle="Verified provider state. Watch channels are only shown after the provider confirms."
-          icon={<Landmark className="size-4 text-faint" />}
-        />
-        <Button
-          size="sm"
-          icon={<Send className="size-4" />}
-          loading={initiating}
-          onClick={initiate}
-        >
-          Initiate settlement
-        </Button>
-      </div>
+      <CardHeader
+        title="Settlement"
+        subtitle="Verified provider state. Watch channels are only shown after the provider confirms."
+        icon={<Landmark className="size-4 text-faint" />}
+        action={
+          <Button
+            size="sm"
+            icon={<Send className="size-4" />}
+            loading={initiating}
+            onClick={initiate}
+          >
+            Initiate settlement
+          </Button>
+        }
+      />
 
       {settlementApi.loading ? (
         <Loading rows={6} />
@@ -125,7 +125,7 @@ export default function DealSettlement() {
                 <StatusChip label={humanLabel(s.status)} tone={toneFor.settlement(s.status)} dot />
               }
             />
-            <div className="grid grid-cols-2 gap-4 border-t border-line p-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 border-t border-line p-4 sm:grid-cols-2 lg:grid-cols-4">
               <KeyValues
                 values={[
                   ["Amount", fmtMoney(s.amount, s.currency)],
@@ -178,7 +178,7 @@ export default function DealSettlement() {
                   <span className="text-sm text-paper">{humanLabel(r.status)}</span>
                   <StatusChip size="xs" label={humanLabel(r.status)} tone={toneFor.reconciliation(r.status)} />
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                   <p className="text-faintest">Expected <span className="mono text-muted">{fmtMoney(r.expectedAmount, r.expectedCurrency)}</span></p>
                   <p className="text-faintest">Actual {r.actualAmount ? <span className="mono text-muted">{fmtMoney(r.actualAmount, r.actualCurrency ?? r.expectedCurrency)}</span> : <span className="text-faintest">—</span>}</p>
                 </div>
@@ -262,14 +262,14 @@ function CantonPayActions({
           Connect Metatarz wallet first
         </Button>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Token">
           <Select options={tokenOptions} value={token} onChange={(e) => setToken(e.target.value)} />
         </Field>
         <Field label="Amount">
           <Input inputMode="decimal" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
         </Field>
-        <div className="col-span-2 lg:col-span-1">
+        <div className="sm:col-span-2 lg:col-span-1">
           <Field label="Recipient (Canton party)" hint={settlement.currency === "CC" ? `${settlement.amount} ${settlement.currency} expected` : undefined}>
             <Input mono placeholder="0x… or Canton::…" value={to} onChange={(e) => setTo(e.target.value)} />
           </Field>

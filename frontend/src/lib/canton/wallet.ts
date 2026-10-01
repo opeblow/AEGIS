@@ -81,10 +81,65 @@ export async function detectMetatarzWallet(timeoutMs = WAIT_MS): Promise<WalletP
     return { name: "MetaMask", uuid: "window.ethereum", request: eth.request.bind(eth) };
   }
 
+  // Demo mode: no extension installed. Return an in-page stand-in so the flow
+  // can be demonstrated on a machine with no wallet. Gated on an explicit
+  // build-time flag and clearly surfaced in the UI as a demo session.
+  if (DEMO_MODE) {
+    return {
+      name: "Metatarz (demo)",
+      uuid: "aegis-demo-wallet",
+      request: demoRequest,
+    };
+  }
+
   throw new CantonWalletError(
     "No Metatarz or MetaMask wallet detected. Install the Metatarz extension and whitelist this site (and your party addresses in Canton) before proceeding.",
     "CANTON_WALLET_MISSING",
   );
+}
+
+export const DEMO_MODE =
+  process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+const DEMO_ACCOUNT = "0x9A7c3F1e5bB24d0A6c8E1f4B2d7095A3c8E6f1B42";
+
+/**
+ * In-page EIP-1193 stand-in used only in demo mode. It fabricates a plausible
+ * Canton `update_id` so the backend's verification path can be exercised
+ * without a real ledger. Never reached when a wallet extension is installed.
+ */
+async function demoRequest(args: { method: string; params?: unknown[] }): Promise<unknown> {
+  switch (args.method) {
+    case "eth_requestAccounts":
+    case "eth_accounts":
+      return [DEMO_ACCOUNT];
+    case "eth_chainId":
+      return `0x${CANTON_CHAIN_ID.toString(16)}`;
+    case "eth_getBalance":
+      return "0x1bc16d674ec80000"; // 2 CC
+    case "eth_call":
+      return "0x0000000000000000000000000000000000000000000000000000000005f5e100";
+    case "eth_getTransactionReceipt":
+      return {
+        status: "0x1",
+        blockNumber: "0x1",
+        transactionHash: (args.params?.[0] as string) ?? "0x0",
+      };
+    case "eth_sendTransaction":
+      return fakeUpdateId();
+    default:
+      throw new CantonWalletError(
+        `Demo wallet does not implement ${args.method}.`,
+        "DEMO_WALLET_UNSUPPORTED",
+      );
+  }
+}
+
+/** Fabricates a 32-byte hex update id shaped like a Canton ledger update. */
+function fakeUpdateId(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 export interface SendTransferOptions {

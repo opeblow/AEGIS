@@ -27,6 +27,7 @@
     "db:push": "prisma db push",
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
+    "db:demo": "tsx prisma/demo-seed.ts",
     "db:test:setup": "node scripts/db-test-setup.mjs"
   },
   "prisma": {

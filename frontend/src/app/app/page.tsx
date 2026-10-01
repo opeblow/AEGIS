@@ -64,10 +64,10 @@ export default function CommandCenter() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       {/* Heading */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <p className="eyebrow">Command center</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-paper">
+          <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-paper">
             {activeOrg?.organization?.name ?? "Aegis"}
           </h1>
         </div>
@@ -198,7 +198,7 @@ function StatBand({
   loading: boolean;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-8">
+    <div className="grid w-full grid-cols-3 gap-4 sm:w-auto sm:gap-8">
       <Stat label="Deals" value={loading ? "…" : deals} tone={active > 0 ? "accent" : "neutral"} />
       <Stat label="In flight" value={active} tone="steel" />
       <Stat label="Approval reviews" value={reviews} tone={reviews > 0 ? "amber" : "neutral"} />
@@ -447,7 +447,7 @@ function ActivityPanel({ orgId }: { orgId: string }) {
                 <Hash className="size-3.5 text-faint" />
               )}
             </div>
-            <span className="mono text-xs text-muted">{e.type}</span>
+            <span className="mono truncate text-xs text-muted">{e.type}</span>
           </div>
           <span className="shrink-0 text-xs text-faintest">{timeAgo(e.createdAt)}</span>
         </div>

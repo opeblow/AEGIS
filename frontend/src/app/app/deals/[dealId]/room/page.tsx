@@ -63,22 +63,22 @@ export default function DealRoom() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         {/* Offer thread */}
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <CardHeader
-              title="Negotiation thread"
-              subtitle="Offers are immutable once submitted"
-              icon={<ArrowLeftRight className="size-4 text-faint" />}
-            />
-            {canOffer && (
-              <Button
-                size="sm"
-                icon={<Send className="size-4" />}
-                onClick={() => setNewOpen(true)}
-              >
-                New offer
-              </Button>
-            )}
-          </div>
+          <CardHeader
+            title="Negotiation thread"
+            subtitle="Offers are immutable once submitted"
+            icon={<ArrowLeftRight className="size-4 text-faint" />}
+            action={
+              canOffer ? (
+                <Button
+                  size="sm"
+                  icon={<Send className="size-4" />}
+                  onClick={() => setNewOpen(true)}
+                >
+                  New offer
+                </Button>
+              ) : undefined
+            }
+          />
 
           {offers.loading ? (
             <Loading rows={4} />
@@ -195,17 +195,17 @@ function OfferRow({
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           {mine ? (
-            <Send className="size-4 text-accent-strong" />
+            <Send className="size-4 shrink-0 text-accent-strong" />
           ) : (
-            <ArrowLeftRight className="size-4 text-steel" />
+            <ArrowLeftRight className="size-4 shrink-0 text-steel" />
           )}
-          <div>
-            <p className="text-sm text-paper">
+          <div className="min-w-0">
+            <p className="truncate text-sm text-paper">
               {mine ? "You offered" : `${offer.createdByOrganizationName} offered`}
             </p>
-            <p className="text-xs text-faintest">
+            <p className="truncate text-xs text-faintest">
               {offer.direction === "sent" ? "to " : "from "}
               {(offer.direction === "sent" ? offer.recipientOrganizationName : offer.createdByOrganizationName)}
             </p>
@@ -234,7 +234,7 @@ function OfferRow({
       </div>
 
       {actionable && (
-        <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
           <Button
             size="sm"
             variant="success"

@@ -10,6 +10,7 @@ import {
 } from "@oneswap/sdk";
 import { getEnv } from "../../config/env.js";
 import { AppError } from "../../lib/errors/index.js";
+import { getDemoOneSwapClient } from "./oneswap.demo.client.js";
 
 export interface OneSwapQuoteParams {
   from: string;
@@ -106,13 +107,32 @@ class OfficialOneSwapClient implements OneSwapClient {
 
 let clientInstance: OneSwapClient | null = null;
 
-/** Creates the real OneSwap client. No implicit mock or endpoint guessing. */
+/**
+ * True when the offline demo stand-in may be used: DEMO_MODE=true AND no
+ * integrator key. A configured key always wins, so enabling demo mode can
+ * never shadow the real provider.
+ */
+function demoModeAllowed(): boolean {
+  const env = getEnv();
+  const demo = env.DEMO_MODE === "true";
+  return demo && !env.ONESWAP_API_KEY?.trim();
+}
+
+/**
+ * Creates the real OneSwap client. When `DEMO_MODE=true` and no API key is
+ * configured, returns the offline demo stand-in instead so the flow is
+ * demonstrable without an integrator account.
+ */
 export function getOneSwapClient(): OneSwapClient {
   if (clientInstance) return clientInstance;
 
   const env = getEnv();
   const apiKey = env.ONESWAP_API_KEY?.trim();
   if (!apiKey) {
+    if (demoModeAllowed()) {
+      clientInstance = getDemoOneSwapClient();
+      return clientInstance;
+    }
     throw new AppError({
       statusCode: 503,
       code: "ONESWAP_NOT_CONFIGURED",

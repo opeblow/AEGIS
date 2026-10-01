@@ -263,7 +263,7 @@ export default function DealCanton() {
             icon={<Coins className="size-4 text-faint" />}
           />
           <CardBody className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="From token">
                 <Select options={tokenOptions} value={fromToken} onChange={(e) => setFromToken(e.target.value)} />
               </Field>
@@ -271,7 +271,7 @@ export default function DealCanton() {
                 <Select options={tokenOptions} value={toToken} onChange={(e) => setToToken(e.target.value)} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Amount">
                 <Input inputMode="decimal" placeholder="1.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </Field>
@@ -315,7 +315,7 @@ export default function DealCanton() {
             right={<StatusChip size="xs" label={swap.status} tone={swapTone(swap.status)} dot />}
           />
           <CardBody className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KeyValues
                 values={[
                   ["Pair", `${swap.inSymbol ?? "?"} → ${swap.outSymbol ?? "?"}`],
@@ -362,7 +362,7 @@ export default function DealCanton() {
               <p className="text-sm text-faintest">Terminal: {swap.status}. No further wallet action needed.</p>
             )}
             {!swapActive && swap.txId && (
-              <p className="mono text-xs text-faintest">execution update: {swap.txId}</p>
+              <p className="mono truncate text-xs text-faintest">execution update: {swap.txId}</p>
             )}
           </CardBody>
         </Card>
@@ -419,10 +419,10 @@ function PoolTickerRow({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-ink-925 px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-ink-925 px-3 py-2.5">
       <span className="mono text-xs text-paper">{label}</span>
-      <span className="text-xs text-muted">{poolId.slice(0, 18)}…</span>
-      <span className="ml-auto text-xs text-faintest">
+      <span className="min-w-0 max-w-full flex-1 truncate text-xs text-muted">{poolId.slice(0, 18)}…</span>
+      <span className="text-xs text-faintest sm:ml-auto">
         {loading
           ? "loading…"
           : failed

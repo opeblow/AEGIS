@@ -94,7 +94,7 @@ export function Drawer({
   title,
   children,
   side = "right",
-  width = "26rem",
+  width = "min(26rem, 100vw)",
 }: Pick<OverlayProps, "open" | "onClose" | "title" | "children"> & {
   side?: "right" | "left";
   width?: string;

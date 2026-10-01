@@ -91,7 +91,7 @@ export default function DealAudit() {
             {events.map((e) => (
               <div key={e.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="mono text-xs text-paper">{e.type}</p>
+                  <p className="mono truncate text-xs text-paper">{e.type}</p>
                   {e.actor && <p className="truncate text-[11px] text-faintest">{e.actor.email}</p>}
                 </div>
                 <span className="shrink-0 text-xs text-faintest">{timeAgo(e.createdAt)}</span>

@@ -40,8 +40,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const commands = getAppCommands();
 
   return (
-    <div className="relative isolate flex min-h-screen overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <div className="relative isolate flex min-h-screen overflow-x-clip">
+        <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <div className="absolute -right-56 top-20 size-[560px] rounded-full bg-accent/3 blur-[130px]" />
         <svg className="absolute -right-24 top-16 hidden h-[380px] w-[420px] opacity-[0.06] xl:block" viewBox="0 0 420 380" fill="none"><g stroke="#8795a5"><path d="M20 20 120 82l78-45 92 72 92-35M120 82l5 105 73-150 48 130 44-58 92-35M125 187l-74 46 92 39 60-85 83 20 57 73M143 272l-30 83 108-76 93 7 40 51"/></g><g fill="#9eabb8"><circle cx="20" cy="20" r="4"/><circle cx="120" cy="82" r="5"/><circle cx="198" cy="37" r="4"/><circle cx="290" cy="109" r="5"/><circle cx="382" cy="74" r="4"/><circle cx="125" cy="187" r="4"/><circle cx="51" cy="233" r="5"/><circle cx="143" cy="272" r="4"/><circle cx="226" cy="187" r="4"/><circle cx="333" cy="280" r="5"/></g></svg>
       </div>
@@ -111,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-ink-900/80 px-4 backdrop-blur-sm sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="focus-ring rounded-md p-1.5 text-muted hover:bg-ink-850 lg:hidden"
+              className="focus-ring -ml-1.5 shrink-0 rounded-md p-2.5 text-muted hover:bg-ink-850 lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation"
             >
@@ -119,11 +119,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
             <OrgSwitcher />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <CantonWalletChip />
             <button
               onClick={() => setOpen(true)}
-              className="focus-ring flex h-8 items-center gap-2 rounded-lg border border-line bg-ink-925 px-3 text-xs text-faint transition-colors hover:border-line-strong hover:text-muted"
+              className="focus-ring flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-ink-925 text-faint transition-colors hover:border-line-strong hover:text-muted sm:h-8 sm:w-auto sm:gap-2 sm:px-3"
             >
               <Search className="size-3.5" />
               <span className="hidden sm:inline">Search and run commands</span>
@@ -155,16 +155,16 @@ function OrgSwitcher() {
   const [open, setOpen] = useState(false);
   if (!activeOrg) return <div className="text-xs text-faintest">No organization</div>;
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="focus-ring group flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-ink-850"
+        className="focus-ring group flex max-w-40 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-ink-850 sm:max-w-none"
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <Building2 className="size-4 text-faint" />
-        <span className="text-sm font-medium text-paper">{activeOrg.organization?.name ?? "Aegis"}</span>
-        <ChevronRight className={cn("size-3.5 text-faintest transition-transform", open && "rotate-90")} />
+        <Building2 className="size-4 shrink-0 text-faint" />
+        <span className="truncate text-sm font-medium text-paper">{activeOrg.organization?.name ?? "Aegis"}</span>
+        <ChevronRight className={cn("size-3.5 shrink-0 text-faintest transition-transform", open && "rotate-90")} />
       </button>
       {open && (
         <div className="animate-scale-in absolute left-0 z-50 mt-1 w-64 rounded-xl border border-line-strong bg-ink-875 p-1 shadow-2xl">

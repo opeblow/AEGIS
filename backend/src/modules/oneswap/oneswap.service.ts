@@ -5,6 +5,7 @@ import type { DealViewer } from "../negotiation/participant-policy.js";
 import type { RequestMeta } from "../organizations/organization.service.js";
 import { recordSecurityEvent, SecurityEventType } from "../auth/security-events.js";
 import { getOneSwapClient } from "./oneswap.client.js";
+import { getDemoOneSwapClient } from "./oneswap.demo.client.js";
 import { getMetatarzRpcClient } from "../settlement/canton/metatarz/metatarz.client.js";
 import type {
   LiquidityAddBody,
@@ -282,18 +283,26 @@ export async function recordSwapDeposit(
 
   const swap = await client.getSwapStatus(swapId);
 
+  // In demo mode there is no real ledger to confirm against, so the demo
+  // client advances the swap locally and the deposit is accepted as verified.
+  const isDemo = client.name === "oneswap-demo";
   let verified = false;
-  try {
-    verified = await getMetatarzRpcClient().hasConfirmedTransaction(body.updateId);
-  } catch {
-    verified = false;
-  }
-  if (!verified) {
-    throw new AppError({
-      statusCode: 422,
-      code: "CANTON_UPDATE_NOT_CONFIRMED",
-      message: "The reported Canton update id could not be confirmed on the ledger.",
-    });
+  if (isDemo) {
+    verified = true;
+    await getDemoOneSwapClient().recordDemoDeposit(swapId, body.updateId);
+  } else {
+    try {
+      verified = await getMetatarzRpcClient().hasConfirmedTransaction(body.updateId);
+    } catch {
+      verified = false;
+    }
+    if (!verified) {
+      throw new AppError({
+        statusCode: 422,
+        code: "CANTON_UPDATE_NOT_CONFIRMED",
+        message: "The reported Canton update id could not be confirmed on the ledger.",
+      });
+    }
   }
 
   const providerResponse = {
@@ -303,6 +312,7 @@ export async function recordSwapDeposit(
       senderAddress: body.senderAddress ?? null,
       verifiedAt: new Date().toISOString(),
       swapStatus: swap.status,
+      demo: isDemo,
     },
   };
   await prisma.$executeRaw`

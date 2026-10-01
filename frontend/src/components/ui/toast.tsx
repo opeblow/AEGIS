@@ -58,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {mounted &&
         createPortal(
-          <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-80 flex-col gap-2">
+          <div className="pointer-events-none fixed bottom-4 left-4 z-[70] flex w-[calc(100vw-2rem)] max-w-80 flex-col gap-2 sm:left-auto">
             {toasts.map((t) => (
               <div
                 key={t.id}
@@ -71,7 +71,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </div>
                 <button
                   onClick={() => dismiss(t.id)}
-                  className="focus-ring rounded p-1 text-faint hover:text-paper"
+                  className="focus-ring -mr-1 -mt-1 shrink-0 rounded p-2 text-faint hover:text-paper"
                   aria-label="Dismiss"
                 >
                   <X className="size-3.5" />

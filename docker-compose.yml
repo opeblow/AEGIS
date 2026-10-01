@@ -1,0 +1,75 @@
+# Local demo stack. `docker compose up -d` gives you all four services plus
+# Postgres, then `docker compose exec backend npm run db:demo` loads the demo
+# dataset. Every external provider is stubbed, so this works offline.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - aegis-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai-ml:
+    build: ./ai-ml
+    environment:
+      AEGIS_AI_PORT: "8555"
+      AEGIS_AI_ENVIRONMENT: production
+      # Deterministic mock provider: no hosted model credentials needed.
+      AEGIS_AI_MODEL_PROVIDER: mock
+      AEGIS_AI_MODEL_VERSION: aegis-mock-v1
+      # Must match the backend's AI_SERVICE_TOKEN.
+      AEGIS_AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?set AI_SERVICE_TOKEN}
+    ports:
+      - "8555:8555"
+
+  quantum:
+    build: ./quantum computing
+    environment:
+      QUANTUM_PORT: "8557"
+      QUANTUM_ENVIRONMENT: production
+      QUANTUM_SOLVER: simulator
+      # Must match the backend's QUANTUM_SERVICE_TOKEN.
+      QUANTUM_API_TOKEN: ${QUANTUM_SERVICE_TOKEN:?set QUANTUM_SERVICE_TOKEN}
+    ports:
+      - "8557:8557"
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-ml:
+        condition: service_started
+      quantum:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aegis?schema=public
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: info
+      AI_SERVICE_URL: http://ai-ml:8555
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?set AI_SERVICE_TOKEN}
+      QUANTUM_SERVICE_URL: http://quantum:8557
+      QUANTUM_SERVICE_TOKEN: ${QUANTUM_SERVICE_TOKEN:?set QUANTUM_SERVICE_TOKEN}
+      # Demo substitutes offline stand-ins for OneSwap and the Metatarz
+      # ledger. Set to false and supply ONESWAP_API_KEY for real use.
+      DEMO_MODE: "true"
+      SETTLEMENT_PROVIDER: canton
+      METATARZ_RPC_URL: https://canton-testnet.rpc.wallet.metatarz.xyz
+      METATARZ_CHAIN_ID: "30337"
+    ports:
+      - "4000:4000"
+
+volumes:
+  aegis-pg:

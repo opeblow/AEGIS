@@ -110,9 +110,9 @@ export default function DealIntelligence() {
                 placeholder="e.g. What documents still block settlement readiness?"
                 className="focus-ring w-full rounded-lg border border-line bg-ink-925 px-3 py-2 text-sm text-paper placeholder:text-faintest"
               />
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Muted className="text-xs">Open questions are answered against certified documents only.</Muted>
-                <Button size="sm" icon={<Send className="size-4" />} loading={querying} onClick={ask} disabled={!query.trim() || querying}>
+                <Button className="w-full shrink-0 sm:w-auto" size="sm" icon={<Send className="size-4" />} loading={querying} onClick={ask} disabled={!query.trim() || querying}>
                   Ask
                 </Button>
               </div>

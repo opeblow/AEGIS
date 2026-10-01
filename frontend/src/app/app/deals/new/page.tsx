@@ -119,9 +119,9 @@ export default function NewDealPage() {
             <p className="rounded-lg border border-rose/25 bg-rose-soft px-3 py-2 text-sm text-rose">{error}</p>
           )}
 
-          <div className="flex items-center justify-between border-t border-line pt-4">
+          <div className="flex flex-col items-start gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-faintest">Idempotency key generated client-side.</p>
-            <Button onClick={submit} loading={busy} disabled={!type || !name || !amount || busy}>
+            <Button className="w-full shrink-0 sm:w-auto" onClick={submit} loading={busy} disabled={!type || !name || !amount || busy}>
               Create deal
             </Button>
           </div>

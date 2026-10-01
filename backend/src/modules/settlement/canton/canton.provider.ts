@@ -1,9 +1,29 @@
 import { AppError } from "../../../lib/errors/index.js";
+import { getEnv } from "../../../config/env.js";
 import {
   getMetatarzRpcClient,
   type MetatarzRpcClient,
 } from "./metatarz/metatarz.client.js";
 import type { SettlementProviderInterface, SettlementSubmissionPayload, SettlementProviderSubmitResult, SettlementProviderStatusResult, SettlementProviderType } from "../settlement.types.js";
+
+/**
+ * Demo mode fabricates a well-formed Canton update id so a laptop with no
+ * wallet extension can still drive settlement. Never enabled outside a demo.
+ */
+function demoUpdateId(): string {
+  const random = Array.from({ length: 64 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join("");
+  return `0x${random}`;
+}
+
+function isDemoMode(): boolean {
+  try {
+    return getEnv().DEMO_MODE === "true";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Live Canton settlement through the Metatarz non-custodial wallet.
@@ -25,8 +45,9 @@ export class CantonMetatarzProvider implements SettlementProviderInterface {
     payload: SettlementSubmissionPayload,
   ): Promise<SettlementProviderSubmitResult> {
     const metadata = (payload.metadata ?? {}) as Record<string, unknown>;
-    const updateId = typeof metadata.updateId === "string" ? metadata.updateId : null;
-    if (!updateId) {
+    const demo = isDemoMode();
+    const supplied = typeof metadata.updateId === "string" ? metadata.updateId : null;
+    if (!supplied && !demo) {
       throw new AppError({
         statusCode: 409,
         code: "CANTON_SIGNATURE_REQUIRED",
@@ -36,8 +57,10 @@ export class CantonMetatarzProvider implements SettlementProviderInterface {
       });
     }
 
+    const updateId = supplied ?? demoUpdateId();
     const submittedAt = new Date();
-    const confirmed = await this.rpc.hasConfirmedTransaction(updateId);
+    // Demo mode has no ledger to poll, so it confirms locally and settles now.
+    const confirmed = demo ? true : await this.rpc.hasConfirmedTransaction(updateId);
 
     return {
       providerReference: updateId,
@@ -50,7 +73,9 @@ export class CantonMetatarzProvider implements SettlementProviderInterface {
   async getStatus(
     providerReference: string,
   ): Promise<SettlementProviderStatusResult> {
-    const confirmed = await this.rpc.hasConfirmedTransaction(providerReference);
+    const confirmed = isDemoMode()
+      ? true
+      : await this.rpc.hasConfirmedTransaction(providerReference);
     return {
       providerReference,
       externalTransactionId: providerReference,

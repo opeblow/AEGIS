@@ -309,6 +309,21 @@ const envSchema = z.object({
   ONESWAP_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
 
   // ------------------------------------------------------------
+  // Demo mode
+  // ------------------------------------------------------------
+  // Substitutes offline stand-ins for the external providers (OneSwap, Metatarz
+  // ledger confirmation) so the full flow can be demonstrated without an
+  // integrator account or a wallet extension. Only ever enable this for a demo
+  // or a screen recording; it fabricates provider results and must never be
+  // used for real settlements. A configured ONESWAP_API_KEY always wins.
+  DEMO_MODE: z.enum(["true", "false"]).default("false"),
+  /// Canton party address returned as the demo swap deposit party.
+  DEMO_DEPOSIT_PARTY: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, "DEMO_DEPOSIT_PARTY must be a 20-byte hex address")
+    .default("0xDE40000000000000000000000000000000000009"),
+
+  // ------------------------------------------------------------
   // Quantum Optimization (Phase 10)
   // ------------------------------------------------------------
 

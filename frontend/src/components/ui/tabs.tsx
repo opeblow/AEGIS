@@ -31,7 +31,7 @@ export function Tabs({
   };
   return (
     <TabsCtx.Provider value={{ active, setActive }}>
-      <div className={className}>{children}</div>
+      <div className={cn("min-w-0", className)}>{children}</div>
     </TabsCtx.Provider>
   );
 }
@@ -41,7 +41,7 @@ export function TabsList({ children, className }: { children: ReactNode; classNa
     <div
       role="tablist"
       className={cn(
-        "flex items-center gap-0.5 rounded-lg border border-line bg-ink-925 p-0.5",
+        "no-scrollbar flex items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-lg border border-line bg-ink-925 p-0.5",
         className,
       )}
     >
@@ -68,7 +68,7 @@ export function TabsTrigger({
       aria-selected={active}
       onClick={() => ctx.setActive(value)}
       className={cn(
-        "focus-ring flex h-7 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors",
+        "focus-ring flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-medium transition-colors sm:h-7",
         active ? "bg-ink-800 text-paper shadow-sm" : "text-faint hover:text-muted",
       )}
     >

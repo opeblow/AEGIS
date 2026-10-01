@@ -76,7 +76,7 @@ export function Row({
   return (
     <div className={cn("flex items-baseline justify-between gap-4 py-1.5", className)}>
       <dt className="shrink-0 text-xs text-faint">{label}</dt>
-      <dd className={cn("text-right text-sm text-paper", mono && "mono tabular", hint && "text-muted")}
+      <dd className={cn("min-w-0 truncate text-right text-sm text-paper", mono && "mono tabular", hint && "text-muted")}
         title={hint ?? undefined}>
         {value}
       </dd>
@@ -149,7 +149,7 @@ export function Stat({
 
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("w-full overflow-x-auto", className)}>
+    <div className={cn("w-full overflow-x-auto overscroll-x-contain", className)}>
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   );

@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
         <p className="mt-1 text-sm text-muted">Distribution of deal state across this organization.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Total deals" value={String(total)} mono />
         <Stat label="Active notional" value={fmtMoney(activeNotional, "USD", { compact: true })} mono tone="accent" />
         <Stat label="Completed" value={String(completed)} mono />
@@ -79,8 +79,8 @@ export default function AnalyticsPage() {
               const bucket = byStatus.get(s) ?? [];
               const pct = bucket.length ? Math.max(3, Math.round((bucket.length / deals.length) * 100)) : 0;
               return (
-                <div key={s} className="grid grid-cols-[150px_1fr_48px] items-center gap-3">
-                  <div className="flex items-center gap-2">
+                <div key={s} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2rem] items-center gap-2 sm:grid-cols-[150px_minmax(0,1fr)_48px] sm:gap-3">
+                  <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                     <StatusChip size="xs" label={humanLabel(s)} tone={toneFor.deal(s)} />
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-ink-800">

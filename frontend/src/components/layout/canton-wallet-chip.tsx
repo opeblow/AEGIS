@@ -41,13 +41,15 @@ export function CantonWalletChip() {
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-line bg-ink-925 px-2 py-1">
-      <Wallet className="size-3.5 text-accent" />
+    <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-line bg-ink-925 px-2 py-1">
+      <Wallet className="size-3.5 shrink-0 text-accent" />
       <span className="hidden text-xs text-muted md:inline">{name ?? "Metatarz"}</span>
       {cc !== "0" && (
-        <span className="mono text-xs text-paper" title={`CC balance`}>{cc} CC</span>
+        <span className="mono hidden min-w-0 truncate text-xs text-paper lg:inline" title={`CC balance`}>
+          {cc} CC
+        </span>
       )}
-      <span className="mono text-xs text-faintest" title={chainId ? `${CANTON_CHAIN_NAME} · chain ${chainId}` : CANTON_CHAIN_NAME}>
+      <span className="mono min-w-0 truncate text-xs text-faintest" title={chainId ? `${CANTON_CHAIN_NAME} · chain ${chainId}` : CANTON_CHAIN_NAME}>
         {account ? shortAddress(account) : "…"}
       </span>
       <button
@@ -55,7 +57,7 @@ export function CantonWalletChip() {
           disconnect();
           push({ kind: "info", title: "Canton wallet disconnected" });
         }}
-        className="focus-ring rounded p-0.5 text-faint hover:text-rose"
+        className="focus-ring -mr-0.5 shrink-0 rounded p-2 text-faint hover:text-rose"
         aria-label="Disconnect Canton wallet"
         title="Disconnect"
       >

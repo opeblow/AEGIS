@@ -98,7 +98,7 @@ export default function DealOverview() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Notional" value={fmtMoney(deal.notionalAmount, deal.currency)} mono />
         <Stat label="Type" value={dealTypeLabel[deal.type]} />
         <Stat label="Settlement date" value={deal.settlementDate ? fmtDate(deal.settlementDate) : "—"} mono />
